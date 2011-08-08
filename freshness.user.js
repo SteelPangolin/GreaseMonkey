@@ -6,6 +6,7 @@
 // ==/UserScript==
 
 var showDateSource = false;
+var showRelativeDate = true;
 var allowGoogleFallback = true;
 
 function getLastModifedFromGoogle(callback)
@@ -24,11 +25,29 @@ function getLastModifedFromGoogle(callback)
             try {
                 var dateString = $('li.g', doc).first().find('span.f').get(0).textContent;
                 var date = parseDate(dateString);
-                callback(date, 'Google', queryUrl);
+                if (date)
+                {
+                    callback({
+                        date: date,
+                        text: "Google",
+                        url: queryUrl});
+                }
             }
             catch (e) {}
         }
     });
+}
+
+function showGoogleLookupButton()
+{
+    $('#freshbox')
+        .addClass('freshbox_deferred')
+        .append('<input id="freshbox_lookupBtn" type="button" value="Get date from Google"></input>')
+        .click(function(event) {
+            $('#freshbox_lookupBtn').hide();
+            getLastModifedFromGoogle(displayFreshbox);
+        })
+        .removeClass('freshbox_hidden');
 }
 
 var months = [
@@ -78,7 +97,7 @@ function lookupMonth(month)
 
 function isValidYear(y)
 {
-    return 1990 <= y && y <= 2020;
+    return 1970 <= y && y <= 2038;
 }
 
 function isValidMonth(m)
@@ -165,43 +184,52 @@ function parseDate(str)
     return null;
 }
 
-function findPageDate(callback)
+function dateInfoFromElem(date, text, elem)
+{
+    var url;
+    if (!elem)
+    {
+        url = '#';
+    }
+    else
+    {
+        if (!elem.id) // give the element an id if it doesn't have one
+        {
+            elem.id = Math.random();
+        }
+        url = '#' + encodeURIComponent(elem.id);
+    }
+    return {
+        date: date,
+        text: text,
+        url: url
+    };
+}
+
+function findPageDate()
 {
     var date = parseDate(document.URL);
     if (date)
     {
-        callback(date, 'document URL', '#');
-        return;
+        return dateInfoFromElem(date, 'document URL', null);
     }
     
     var timeNodes = document.evaluate('//time[@datetime]', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
     for (var i = 0; i < timeNodes.snapshotLength; i++)
     {
         var node = timeNodes.snapshotItem(i);
-        var text = node.attributes['datetime'].value;
-        var date = parseDate(text);
+        var date = parseDate(node.attributes['datetime'].value);
         if (!date) continue;
-        if (!node.parentNode.id)
-        {
-            node.parentNode.id = Math.random();
-        }
-        callback(date, 'time element', '#' + encodeURIComponent(node.parentNode.id));
-        return;
+        return dateInfoFromElem(date, 'time element', node.parentNode);
     }
     
     var titleAttrNodes = document.evaluate('//*[@title]', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
     for (var i = 0; i < titleAttrNodes.snapshotLength; i++)
     {
         var node = titleAttrNodes.snapshotItem(i);
-        var text = node.attributes['title'].value;
-        var date = parseDate(text);
+        var date = parseDate(node.attributes['title'].value);
         if (!date) continue;
-        if (!node.id)
-        {
-            node.id = Math.random();
-        }
-        callback(date, 'title attribute', '#' + encodeURIComponent(node.id));
-        return;
+        return dateInfoFromElem(date, 'title attribute', node);
     }
     
     var textNodes = document.evaluate('//text()', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
@@ -209,129 +237,174 @@ function findPageDate(callback)
     {
         var node = textNodes.snapshotItem(i);
         if (!(node instanceof Text)) continue;
-        var text = node.data.trim();
-        if (!text) continue;
-        var date = parseDate(text);
+        var date = parseDate(node.data);
         if (!date) continue;
         if (!node.id)
         {
             node.id = Math.random();
         }
-        callback(date, 'document text', '#' + encodeURIComponent(node.id));
-        return;
+        return dateInfoFromElem(date, 'document text', node);
     }
     
-    if (allowGoogleFallback)
-    {
-        getLastModifedFromGoogle(callback);
-    }
+    return null;
 }
 
-var pastWeekStyle = "\
+var freshboxStyle = "\
 #freshbox {\
+    position: absolute;\
+    top: 10px;\
+    left: 10px;\
+    border-radius: 5px;\
+    padding: 5px;\
+    z-index: 1000;\
+    box-shadow: 3px 3px 2px #aaaaaa;\
+}\
+\
+#freshbox a,\
+#freshbox a:active,\
+#freshbox a:visited,\
+#freshbox a:hover {\
+    text-decoration: underline;\
+}\
+\
+#freshbox_close {\
+    float: right;\
+    margin-left: 0.5em;\
+}\
+\
+.freshbox_hidden {\
+    display: none;\
+}\
+\
+.freshbox_pastWeek {\
     background-color: #BAF349;\
     color: #719E18;\
 }\
 \
-#freshbox a,\
-#freshbox a:active,\
-#freshbox a:visited,\
-#freshbox a:hover {\
+.freshbox_pastWeek a,\
+.freshbox_pastWeek a:active,\
+.freshbox_pastWeek a:visited,\
+.freshbox_pastWeek a:hover {\
     color: #719E18;\
 }\
-";
-
-var pastMonthStyle = "\
-#freshbox {\
+\
+.freshbox_pastMonth {\
     background-color: #FFDA73;\
     color: #A67A00;\
 }\
 \
-#freshbox a,\
-#freshbox a:active,\
-#freshbox a:visited,\
-#freshbox a:hover {\
+.freshbox_pastMonth a,\
+.freshbox_pastMonth a:active,\
+.freshbox_pastMonth a:visited,\
+.freshbox_pastMonth a:hover {\
     color: #A67A00;\
 }\
-";
-
-var pastYearStyle = "\
-#freshbox {\
+\
+.freshbox_pastYear {\
     background-color: #FFD383;\
     color: #FF9900;\
 }\
 \
-#freshbox a,\
-#freshbox a:active,\
-#freshbox a:visited,\
-#freshbox a:hover {\
+.freshbox_pastYear a,\
+.freshbox_pastYear a:active,\
+.freshbox_pastYear a:visited,\
+.freshbox_pastYear a:hover {\
     color: #FF9900;\
 }\
-";
-
-var oldStyle = "\
-#freshbox {\
+\
+.freshbox_old {\
     background-color: #FFB4B1;\
     color: #FF392F;\
 }\
 \
-#freshbox a,\
-#freshbox a:active,\
-#freshbox a:visited,\
-#freshbox a:hover {\
+.freshbox_old a,\
+.freshbox_old a:active,\
+.freshbox_old a:visited,\
+.freshbox_old a:hover {\
     color: #FF392F;\
+}\
+\
+.freshbox_deferred {\
+\
+    background-color: #E4EDF7;\
+    color: #336699;\
+}\
+\
+.freshbox_deferred a,\
+.freshbox_deferred a:active,\
+.freshbox_deferred a:visited,\
+.freshbox_deferred a:hover {\
+    color: #336699;\
 }\
 ";
 
-function styleFreshbox(date)
+function displayFreshbox(dateInfo)
 {
     var today = Date.now();
-    var ageInDays = (today - date) / (24 * 60 * 60 * 1000);
-    if (ageInDays < 7) GM_addStyle(pastWeekStyle);
-    else if (ageInDays < 30) GM_addStyle(pastMonthStyle);
-    else if (ageInDays < 365) GM_addStyle(pastYearStyle);
-    else GM_addStyle(oldStyle);
-}
-
-function displayFreshbox(date, sourceText, sourceURL)
-{
-    $('body').append('<div id="freshbox">' + date.toDateString() + ' &#x2716;</div>');
+    var ageInDays = Math.floor((today - dateInfo.date) / (24 * 60 * 60 * 1000));
+    var freshnessClass;
+    var unitName;
+    var unitDays;
+    if (ageInDays < 7)
+    {
+        freshnessClass = 'freshbox_pastWeek';
+        unitName = "day";
+        unitDays = 1;
+    }
+    else if (ageInDays < 30)
+    {
+        freshnessClass = 'freshbox_pastMonth';
+        unitName = "week";
+        unitDays = 7;
+    }
+    else if (ageInDays < 365)
+    {
+        freshnessClass = 'freshbox_pastYear';
+        unitName = "month";
+        unitDays = 30;
+    }
+    else
+    {
+        freshnessClass = 'freshbox_old';
+        unitName = "year";
+        unitDays = 365;
+    }
+    units = Math.floor(ageInDays / unitDays);
+    var dateString;
+    if (showRelativeDate)
+    {
+        dateString = units + " " + unitName + (units === 1 ? "" : "s") + " old";
+    }
+    else
+    {
+        dateString = date.toDateString();
+    }
+    $('#freshbox')
+        .append(dateString)
+        .addClass(freshnessClass)
+        .removeClass('freshbox_deferred')
+        .removeClass('freshbox_hidden');
     if (showDateSource)
     {
-        $('#freshbox').append('<br/><a id="#freshbox_source" href="' + sourceURL + '">' + sourceText + '</a>');
+        $('#freshbox').append('<br/><a id="#freshbox_source" href="' + dateInfo.url + '">' + dateInfo.text + '</a>');
     }
-    $('#freshbox').click(function() { $(this).fadeOut('fast') });
-}
-
-function displayDate(date, sourceText, sourceURL)
-{
-    styleFreshbox(date);
-    displayFreshbox(date, sourceText, sourceURL);
 }
 
 if (window.top == window.self)
 {
-    GM_addStyle("\
-    #freshbox {\
-        position: absolute;\
-        top: 10px;\
-        left: 10px;\
-        border-radius: 5px;\
-        padding: 5px;\
-        z-index: 1000;\
-        box-shadow: 3px 3px 2px #aaaaaa;\
-    }\
-    \
-    #freshbox a,\
-    #freshbox a:active,\
-    #freshbox a:visited,\
-    #freshbox a:hover {\
-        text-decoration: underline;\
-    }\
-    ");
-    
+    GM_addStyle(freshboxStyle);
     $(document).ready(function()
     {
-        findPageDate(displayDate);
+        $('body').append('<div id="freshbox" class="freshbox_hidden"><div id="freshbox_close">&#x2716;</div></div>');
+        $('#freshbox_close').click(function() { $('#freshbox').fadeOut('fast') });
+        var dateInfo = findPageDate();
+        if (dateInfo)
+        {
+            displayFreshbox(dateInfo);
+        }
+        else if (allowGoogleFallback)
+        {
+            showGoogleLookupButton();
+        }
     });
 }
