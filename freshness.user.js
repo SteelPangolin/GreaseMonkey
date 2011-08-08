@@ -71,7 +71,7 @@ function lookupMonth(month)
     var mon = month.substring(0, 3).toLowerCase();
     for (var i = 0; i < months.length; i++)
     {
-        if (mon === months[i].substring(0, 3).toLowerCase()) return (i + 1);
+        if (mon === months[i].substring(0, 3).toLowerCase()) return i;
     }
     return null; // bad input
 }
@@ -83,7 +83,7 @@ function isValidYear(y)
 
 function isValidMonth(m)
 {
-    return 1 <= m && m <= 12;
+    return 0 <= m && m <= 11;
 }
 
 function isValidDay(d)
@@ -96,8 +96,8 @@ function parseDate1(str)
 {
     var match = date1RE.exec(str);
     if (!match) return null;
+    var m = parseInt(match[3], 10) - 1;
     var y = parseInt(match[1], 10);
-    var m = parseInt(match[3], 10);
     var d = parseInt(match[4], 10);
     return parseDateUnknownMMDDOrder(y, m, d);
 }
@@ -107,7 +107,7 @@ function parseDate2(str)
 {
     var match = date2RE.exec(str);
     if (!match) return null;
-    var m = parseInt(match[1], 10);
+    var m = parseInt(match[1], 10) - 1;
     var d = parseInt(match[3], 10);
     var y = parseInt(match[4], 10);
     return parseDateUnknownMMDDOrder(y, m, d);
