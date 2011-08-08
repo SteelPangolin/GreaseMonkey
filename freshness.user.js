@@ -5,7 +5,10 @@
 // @require        http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js
 // ==/UserScript==
 
-function getLastModifedFromGoogle(url, callback)
+var showDateSource = false;
+var allowGoogleFallback = true;
+
+function getLastModifedFromGoogle(callback)
 {
     var queryUrl = 'http://www.google.com/search?q=inurl:' + encodeURIComponent(document.URL) + '&as_qdr=y15';
     GM_xmlhttpRequest({
@@ -20,17 +23,12 @@ function getLastModifedFromGoogle(url, callback)
             doc.documentElement.appendChild(frag);
             try {
                 var dateString = $('li.g', doc).first().find('span.f').get(0).textContent;
-                callback(dateString, 'Google', queryUrl);
+                var date = parseDate(dateString);
+                callback(date, 'Google', queryUrl);
             }
             catch (e) {}
         }
     });
-}
-
-function displayFreshnessText(text, source, sourceUrl)
-{
-    $('body').append('<div id="freshbox">' + text + ' &#x2716;<br/><a href="' + sourceUrl + '">' + source + '</a></div>');
-    $('#freshbox').click(function() { $(this).fadeOut('fast') });
 }
 
 var months = [
@@ -93,7 +91,7 @@ function isValidDay(d)
     return 1 <= d && d <= 31;
 }
 
-var date1RE = /\b(\d{4})([\/.-])(\d{2})\2(\d{2})\b/i; // YYYY-MM-DD, YYYY/DD/MM
+var date1RE = /\b(\d{4})([\/.-])(\d{2})\2(\d{2})(?:\b|T)/i; // YYYY-MM-DD, YYYY/DD/MM
 function parseDate1(str)
 {
     var match = date1RE.exec(str);
@@ -167,55 +165,173 @@ function parseDate(str)
     return null;
 }
 
-function markDates()
+function findPageDate(callback)
 {
-    var nodes = document.evaluate('//text()', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-    for (var i = 0; i < nodes.snapshotLength; i++)
+    var date = parseDate(document.URL);
+    if (date)
     {
-        var node = nodes.snapshotItem(i);
+        callback(date, 'document URL', '#');
+        return;
+    }
+    
+    var timeNodes = document.evaluate('//time[@datetime]', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    for (var i = 0; i < timeNodes.snapshotLength; i++)
+    {
+        var node = timeNodes.snapshotItem(i);
+        var text = node.attributes['datetime'].value;
+        var date = parseDate(text);
+        if (!date) continue;
+        if (!node.parentNode.id)
+        {
+            node.parentNode.id = Math.random();
+        }
+        callback(date, 'time element', '#' + encodeURIComponent(node.parentNode.id));
+        return;
+    }
+    
+    var titleAttrNodes = document.evaluate('//*[@title]', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    for (var i = 0; i < titleAttrNodes.snapshotLength; i++)
+    {
+        var node = titleAttrNodes.snapshotItem(i);
+        var text = node.attributes['title'].value;
+        var date = parseDate(text);
+        if (!date) continue;
+        if (!node.id)
+        {
+            node.id = Math.random();
+        }
+        callback(date, 'title attribute', '#' + encodeURIComponent(node.id));
+        return;
+    }
+    
+    var textNodes = document.evaluate('//text()', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    for (var i = 0; i < textNodes.snapshotLength; i++)
+    {
+        var node = textNodes.snapshotItem(i);
         if (!(node instanceof Text)) continue;
         var text = node.data.trim();
         if (!text) continue;
         var date = parseDate(text);
         if (!date) continue;
-        node.parentNode.style.backgroundColor = colorAge(date);
+        if (!node.id)
+        {
+            node.id = Math.random();
+        }
+        callback(date, 'document text', '#' + encodeURIComponent(node.id));
+        return;
+    }
+    
+    if (allowGoogleFallback)
+    {
+        getLastModifedFromGoogle(callback);
     }
 }
 
-function colorAge(date)
-{
-    var today = Date.now();
-    var ageInDays = (today - date) / (24 * 60 * 60 * 1000);
-    if (ageInDays < 7) return '#ccffcc';
-    else if (ageInDays < 30) return '#ffffcc';
-    else return '#ffcccc';
-}
-
-GM_addStyle("\
+var pastWeekStyle = "\
 #freshbox {\
-    position: absolute;\
-    top: 10px;\
-    left: 10px;\
-    border-radius: 3px;\
-    border: 3px #FFBC00 solid;\
-    color: #FFDA73;\
-    background-color: #A67A00;\
-    padding: 3px;\
-    z-index: 1000;\
+    background-color: #BAF349;\
+    color: #719E18;\
 }\
 \
 #freshbox a,\
 #freshbox a:active,\
 #freshbox a:visited,\
 #freshbox a:hover {\
-    color: #FFDA73;\
-    text-decoration: underline;\
+    color: #719E18;\
 }\
-");
+";
 
-$(document).ready(function()
+var pastMonthStyle = "\
+#freshbox {\
+    background-color: #FFDA73;\
+    color: #A67A00;\
+}\
+\
+#freshbox a,\
+#freshbox a:active,\
+#freshbox a:visited,\
+#freshbox a:hover {\
+    color: #A67A00;\
+}\
+";
+
+var pastYearStyle = "\
+#freshbox {\
+    background-color: #FFD383;\
+    color: #FF9900;\
+}\
+\
+#freshbox a,\
+#freshbox a:active,\
+#freshbox a:visited,\
+#freshbox a:hover {\
+    color: #FF9900;\
+}\
+";
+
+var oldStyle = "\
+#freshbox {\
+    background-color: #FFB4B1;\
+    color: #FF392F;\
+}\
+\
+#freshbox a,\
+#freshbox a:active,\
+#freshbox a:visited,\
+#freshbox a:hover {\
+    color: #FF392F;\
+}\
+";
+
+function styleFreshbox(date)
 {
-    //getLastModifedFromGoogle(document.URL, displayFreshnessText);
-    //displayFreshnessText(new Date(document.lastModified), 'document.lastModified<br/>', '#');
-    markDates();
-});
+    var today = Date.now();
+    var ageInDays = (today - date) / (24 * 60 * 60 * 1000);
+    if (ageInDays < 7) GM_addStyle(pastWeekStyle);
+    else if (ageInDays < 30) GM_addStyle(pastMonthStyle);
+    else if (ageInDays < 365) GM_addStyle(pastYearStyle);
+    else GM_addStyle(oldStyle);
+}
+
+function displayFreshbox(date, sourceText, sourceURL)
+{
+    $('body').append('<div id="freshbox">' + date.toDateString() + ' &#x2716;</div>');
+    if (showDateSource)
+    {
+        $('#freshbox').append('<br/><a id="#freshbox_source" href="' + sourceURL + '">' + sourceText + '</a>');
+    }
+    $('#freshbox').click(function() { $(this).fadeOut('fast') });
+}
+
+function displayDate(date, sourceText, sourceURL)
+{
+    styleFreshbox(date);
+    displayFreshbox(date, sourceText, sourceURL);
+}
+
+if (window.top == window.self)
+{
+    GM_addStyle("\
+    #freshbox {\
+        position: absolute;\
+        top: 10px;\
+        left: 10px;\
+        border-radius: 5px;\
+        padding: 5px;\
+        z-index: 1000;\
+        box-shadow: 3px 3px 2px #aaaaaa;\
+    }\
+    \
+    #freshbox a,\
+    #freshbox a:active,\
+    #freshbox a:visited,\
+    #freshbox a:hover {\
+        text-decoration: underline;\
+    }\
+    ");
+    
+    $(document).ready(function()
+    {
+        findPageDate(displayDate);
+    });
+}
