@@ -1,12 +1,12 @@
 // ==UserScript==
-// @name           Freshness
+// @name           Freshbox
 // @namespace      http://bat-country.us/
 // @include        *
 // @require        http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js
 // ==/UserScript==
 
 var showDateSource = true;
-var showRelativeDate = false;
+var showRelativeDate = true;
 var allowGoogleFallback = true;
 
 var siteSpecializations = [
@@ -31,7 +31,10 @@ function redditFindPageDate()
     if (linkinfoJQ.size())
     {
         var linkinfo = linkinfoJQ.get(0);
-        return dateInfoFromElem(parseDate(linkinfo.childNodes[0].textContent), 'Reddit (post info)', linkinfo);
+        return dateInfoFromElem(
+            parseDate(linkinfo.childNodes[0].textContent),
+            'Reddit (post info)',
+            linkinfo);
     }
     // otherwise, use most recently submitted time in content div
     return dateInfoFromNewest(
