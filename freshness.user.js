@@ -9,7 +9,7 @@ var showDateSource = false;
 var showRelativeDate = true;
 var allowGoogleFallback = true;
 
-function getLastModifedFromGoogle(callback)
+function getLastModifedFromGoogle(callback, failureCallback)
 {
     var queryUrl = 'http://www.google.com/search?q=inurl:' + encodeURIComponent(document.URL) + '&as_qdr=y15';
     GM_xmlhttpRequest({
@@ -32,6 +32,10 @@ function getLastModifedFromGoogle(callback)
                         text: "Google",
                         url: queryUrl});
                 }
+                else
+                {
+                    failureCallback();
+                }
             }
             catch (e) {}
         }
@@ -43,11 +47,12 @@ function showGoogleLookupButton()
     $('#freshbox')
         .addClass('freshbox_deferred')
         .append('<input id="freshbox_lookupBtn" type="button" value="Get date from Google"></input>')
-        .click(function(event) {
-            $('#freshbox_lookupBtn').hide();
-            getLastModifedFromGoogle(displayFreshbox);
-        })
         .removeClass('freshbox_hidden');
+    $('#freshbox_lookupBtn')
+        .click(function(event) {
+            $(this).hide();
+            getLastModifedFromGoogle(displayFreshbox, closeFreshbox);
+        });
 }
 
 var months = [
@@ -390,13 +395,17 @@ function displayFreshbox(dateInfo)
     }
 }
 
+function closeFreshbox() {
+    $('#freshbox').fadeOut('fast');
+}
+
 if (window.top == window.self)
 {
     GM_addStyle(freshboxStyle);
     $(document).ready(function()
     {
         $('body').append('<div id="freshbox" class="freshbox_hidden"><div id="freshbox_close">&#x2716;</div></div>');
-        $('#freshbox_close').click(function() { $('#freshbox').fadeOut('fast') });
+        $('#freshbox_close').click(closeFreshbox);
         var dateInfo = findPageDate();
         if (dateInfo)
         {
