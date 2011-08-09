@@ -12,15 +12,15 @@ var allowGoogleFallback = true;
 var siteSpecializations = [
     {
         re: /^https?:\/\/(?:www\.)?reddit\.com\//,
-        handler: redditFindPageDate
+        getDate: redditFindPageDate
     },
     {
         re: /^https?:\/\/forums\.somethingawful\.com\/showthread\.php/,
-        handler: saforumsThreadFindPageDate
+        getDate: saforumsThreadFindPageDate
     },
     {
         re: /^https?:\/\/forums\.somethingawful\.com\/forumdisplay\.php/,
-        handler: saforumsForumFindPageDate
+        getDate: saforumsForumFindPageDate
     }
 ];
 
@@ -491,23 +491,17 @@ if (window.top == window.self)
         $('body').append('<div id="freshbox" class="freshbox_hidden"><div id="freshbox_close">&#x2716;</div></div>');
         $('#freshbox_close').click(closeFreshbox);
         var dateInfo = null;
-        for (var i = 0; i < siteSpecializations.length; i++)
+        for (var i = 0; i < extractors.length; i++)
         {
-            var site = siteSpecializations[i];
-            var match = site.re.test(document.URL);
-            if (match)
-            {
+            var extractor = extractors[i];
+            if (!site.re || site.re.test(document.URL))
                 try // allow site-specific handlers to fail in case a site changes
                 {
-                    dateInfo = site.handler();
+                    dateInfo = extractor.getDate();
+                    break;
                 }
                 catch (e) {}
-                break;
             }
-        }
-        if (!dateInfo)
-        {
-            dateInfo = findPageDate();
         }
         if (dateInfo)
         {
