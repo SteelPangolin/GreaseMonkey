@@ -6,74 +6,41 @@
 // ==/UserScript==
 
 var showDateSource = true;
-var showRelativeDate = false;
+var showRelativeDate = true;
 var allowGoogleFallback = true;
 
 var siteSpecializations = [
     {
         re: /^https?:\/\/(?:www\.)?reddit\.com\//,
         handler: redditFindPageDate
-    },
-    {
-        re: /^https?:\/\/forums\.somethingawful\.com\/showthread\.php/,
-        handler: saforumsThreadFindPageDate
-    },
-    {
-        re: /^https?:\/\/forums\.somethingawful\.com\/forumdisplay\.php/,
-        handler: saforumsForumFindPageDate
     }
 ];
 
 function redditFindPageDate()
 {
-    // if a post's link info box is available, use that
     var linkinfoJQ = $('.linkinfo');
     if (linkinfoJQ.size())
     {
         var linkinfo = linkinfoJQ.get(0);
         return dateInfoFromElem(parseDate(linkinfo.childNodes[0].textContent), 'Reddit (post info)', linkinfo);
     }
-    // otherwise, use most recently submitted time in content div
-    return dateInfoFromNewest(
-        $('.content time[datetime]'),
-        function(elem) { return elem.attributes['datetime'].value },
-        'Reddit (newest post on page)');
-}
-
-function saforumsThreadFindPageDate()
-{
-    var postdate = $('.postdate').get(-1);
-    return dateInfoFromElem(
-        parseDate(postdate.textContent),
-        'SomethingAwful Forums (newest post on page)',
-        postdate);
-}
-
-function saforumsForumFindPageDate()
-{
-    return dateInfoFromNewest(
-        $('.date'),
-        function(elem) { return elem.textContent },
-        'SomethingAwful Forums (newest thread on page)');
-}
-
-function dateInfoFromNewest(elems, extractDateString, text)
-{
-    if (elems.jquery) elems = elems.toArray();
-    var newestDateElem = elems[0];
-    var newestDate = parseDate(extractDateString(newestDateElem));
-    GM_log(newestDateElem);
-    for (var i = 1; i < elems.length; i++)
+    // use most recently submitted time in content div
+    var timeElems = $('.content time[datetime]').toArray();
+    if (timeElems.length === 0) return null;
+    GM_log(timeElems.length);
+    var newestDateElem = timeElems[0];
+    var newestDate = parseDate(newestDateElem.attributes['datetime'].value);
+    for (var i = 1; i < timeElems.length; i++)
     {
-        var elem = elems[i];
-        var date = parseDate(extractDateString(elem));
+        var elem = timeElems[i];
+        var date = parseDate(elem.attributes['datetime'].value);
         if (date > newestDate)
         {
             newestDate = date;
             newestDateElem = elem;
         }
     }
-    return dateInfoFromElem(newestDate, text, newestDateElem);
+    return dateInfoFromElem(newestDate, 'Reddit (newest post on page)', newestDateElem);
 }
 
 function getLastModifedFromGoogle(callback, failureCallback)
@@ -421,13 +388,8 @@ var freshboxStyle = "\
 
 function displayFreshbox(dateInfo)
 {
-    var today = new Date();
+    var today = Date.now();
     var ageInDays = Math.floor((today - dateInfo.date) / (24 * 60 * 60 * 1000));
-    if (ageInDays < 0)
-    {
-        // happens because we currently ignore time and timezone info
-        ageInDays = 0;
-    }
     var freshnessClass;
     var unitName;
     var unitDays;
@@ -463,7 +425,7 @@ function displayFreshbox(dateInfo)
     }
     else
     {
-        dateString = dateInfo.date.toDateString();
+        dateString = date.toDateString();
     }
     $('#freshbox')
         .append(dateString)
@@ -488,17 +450,14 @@ if (window.top == window.self)
         $('body').append('<div id="freshbox" class="freshbox_hidden"><div id="freshbox_close">&#x2716;</div></div>');
         $('#freshbox_close').click(closeFreshbox);
         var dateInfo = null;
+        GM_log(document.URL);
         for (var i = 0; i < siteSpecializations.length; i++)
         {
             var site = siteSpecializations[i];
             var match = site.re.test(document.URL);
             if (match)
             {
-                try // allow site-specific handlers to fail in case a site changes
-                {
-                    dateInfo = site.handler();
-                }
-                catch (e) {}
+                dateInfo = site.handler();
                 break;
             }
         }
