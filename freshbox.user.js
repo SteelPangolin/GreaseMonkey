@@ -9,122 +9,6 @@ var showDateSource = true;
 var showRelativeDate = true;
 var allowGoogleFallback = true;
 
-var siteSpecializations = [
-    {
-        re: /^https?:\/\/(?:www\.)?reddit\.com\//,
-        getDate: redditFindPageDate
-    },
-    {
-        re: /^https?:\/\/forums\.somethingawful\.com\/showthread\.php/,
-        getDate: saforumsThreadFindPageDate
-    },
-    {
-        re: /^https?:\/\/forums\.somethingawful\.com\/forumdisplay\.php/,
-        getDate: saforumsForumFindPageDate
-    }
-];
-
-function redditFindPageDate()
-{
-    // if a post's link info box is available, use that
-    var linkinfoJQ = $('.linkinfo');
-    if (linkinfoJQ.size())
-    {
-        var linkinfo = linkinfoJQ.get(0);
-        return dateInfoFromElem(
-            parseDate(linkinfo.childNodes[0].textContent),
-            'Reddit (post info)',
-            linkinfo);
-    }
-    // otherwise, use most recently submitted time in content div
-    return dateInfoFromNewest(
-        $('.content time[datetime]'),
-        function(elem) { return elem.attributes['datetime'].value },
-        'Reddit (newest post on page)');
-}
-
-function saforumsThreadFindPageDate()
-{
-    var postdate = $('.postdate').get(-1);
-    return dateInfoFromElem(
-        parseDate(postdate.textContent),
-        'SomethingAwful Forums (newest post on page)',
-        postdate);
-}
-
-function saforumsForumFindPageDate()
-{
-    return dateInfoFromNewest(
-        $('.date'),
-        function(elem) { return elem.textContent },
-        'SomethingAwful Forums (newest thread on page)');
-}
-
-function dateInfoFromNewest(elems, extractDateString, text)
-{
-    if (elems.jquery) elems = elems.toArray();
-    var newestDateElem = elems[0];
-    var newestDate = parseDate(extractDateString(newestDateElem));
-    GM_log(newestDateElem);
-    for (var i = 1; i < elems.length; i++)
-    {
-        var elem = elems[i];
-        var date = parseDate(extractDateString(elem));
-        if (date > newestDate)
-        {
-            newestDate = date;
-            newestDateElem = elem;
-        }
-    }
-    return dateInfoFromElem(newestDate, text, newestDateElem);
-}
-
-function getLastModifedFromGoogle(callback, failureCallback)
-{
-    var queryUrl = 'http://www.google.com/search?q=inurl:' + encodeURIComponent(document.URL) + '&as_qdr=y15';
-    GM_xmlhttpRequest({
-        method: 'GET',
-        url: queryUrl,
-        onload: function(response)
-        {
-            var range = document.createRange();
-            var frag = range.createContextualFragment(response.responseText);
-            var doc = document.implementation.createHTMLDocument(null);
-            doc.adoptNode(frag);
-            doc.documentElement.appendChild(frag);
-            try {
-                var dateString = $('li.g', doc).first().find('span.f').get(0).textContent;
-                var date = parseDate(dateString);
-                if (date)
-                {
-                    callback({
-                        date: date,
-                        text: "Google",
-                        url: queryUrl});
-                }
-                else
-                {
-                    failureCallback();
-                }
-            }
-            catch (e) {}
-        }
-    });
-}
-
-function showGoogleLookupButton()
-{
-    $('#freshbox')
-        .addClass('freshbox_deferred')
-        .append('<input id="freshbox_lookupBtn" type="button" value="Get date from Google"></input>')
-        .removeClass('freshbox_hidden');
-    $('#freshbox_lookupBtn')
-        .click(function(event) {
-            $(this).hide();
-            getLastModifedFromGoogle(displayFreshbox, closeFreshbox);
-        });
-}
-
 var months = [
     'January',
     'February',
@@ -261,6 +145,7 @@ function parseDate(str)
 
 function dateInfoFromElem(date, text, elem)
 {
+    if (!date) return null;
     var url;
     if (!elem)
     {
@@ -281,6 +166,30 @@ function dateInfoFromElem(date, text, elem)
     };
 }
 
+function dateInfoFromNewest(elems, extractDateString, text)
+{
+    if (elems.jquery) elems = elems.toArray();
+    var newestDateElem = elems[0];
+    var newestDate = parseDate(extractDateString(newestDateElem));
+    for (var i = 1; i < elems.length; i++)
+    {
+        var elem = elems[i];
+        var date = parseDate(extractDateString(elem));
+        if (date > newestDate)
+        {
+            newestDate = date;
+            newestDateElem = elem;
+        }
+    }
+    return dateInfoFromElem(newestDate, text, newestDateElem);
+}
+
+function dateInfoFromFirst(elems, extractDateString, text)
+{
+    if (elems.jquery) elems = elems.toArray();
+    return dateInfoFromElem(parseDate(extractDateString(elems[0])), text, elems[0]);
+}
+
 function xpath(expr, node, doc)
 {
     if (!node) node = document;
@@ -294,14 +203,17 @@ function xpath(expr, node, doc)
     return nodes;
 }
 
-function findPageDate()
+function getTextContent(elem) {
+    return elem.textContent;
+}
+
+function getDateInfo_documentURL()
 {
-    var date = parseDate(document.URL);
-    if (date)
-    {
-        return dateInfoFromElem(date, 'document URL', null);
-    }
-    
+    return dateInfoFromElem(parseDate(document.URL), 'document URL', null);
+}
+
+function getDateInfo_time()
+{
     var timeElems = xpath('//time[@datetime]');
     for (var i = 0; i < timeElems.length; i++)
     {
@@ -310,7 +222,11 @@ function findPageDate()
         if (!date) continue;
         return dateInfoFromElem(date, 'time element', elem.parentElem);
     }
-    
+    return null;
+}
+
+function getDateInfo_title()
+{
     var titleAttrElems = xpath('//*[@title]');
     for (var i = 0; i < titleAttrElems.length; i++)
     {
@@ -319,7 +235,11 @@ function findPageDate()
         if (!date) continue;
         return dateInfoFromElem(date, 'title attribute', elem);
     }
-    
+    return null;
+}
+
+function getDateInfo_text()
+{
     var textNodes = xpath('//text()');
     for (var i = 0; i < textNodes.length; i++)
     {
@@ -329,9 +249,94 @@ function findPageDate()
         if (!date) continue;
         return dateInfoFromElem(date, 'document text', node.parentNode);
     }
-    
     return null;
 }
+
+function getDateInfo_reddit()
+{
+    // if a post's link info box is available, use that
+    var linkinfoJQ = $('.linkinfo');
+    if (linkinfoJQ.size())
+    {
+        var linkinfo = linkinfoJQ.get(0);
+        return dateInfoFromElem(
+            parseDate(linkinfo.childNodes[0].textContent),
+            'Reddit (post info)',
+            linkinfo);
+    }
+    // otherwise, use most recently submitted time in content div
+    return dateInfoFromNewest(
+        $('.content time[datetime]'),
+        function(elem) { return elem.attributes['datetime'].value; },
+        'Reddit (newest post on page)');
+}
+
+function getDateInfo_saforumsThread()
+{
+    var postdate = $('.postdate').get(-1);
+    return dateInfoFromElem(
+        parseDate(postdate.textContent),
+        'SomethingAwful Forums (newest post on page)',
+        postdate);
+}
+
+function getDateInfo_saforumsForum()
+{
+    return dateInfoFromNewest(
+        $('.date'),
+        getTextContent,
+        'SomethingAwful Forums (newest thread on page)');
+}
+
+var mediawikiLastmodSelectors = [
+    '#footer-info-lastmod',
+    '#lastmod'
+];
+function getDateInfo_mediawiki()
+{
+    for (var i = 0; i < mediawikiLastmodSelectors.length; i++)
+    {
+        var lastmod = $(mediawikiLastmodSelectors[i]);
+        if (lastmod.size())
+        {
+            return dateInfoFromFirst(
+                lastmod,
+                getTextContent,
+                'MediaWiki last modified date');
+        }
+    }
+    return null;
+}
+
+var extractors = [
+    {
+        re: /^https?:\/\/(?:www\.)?reddit\.com\//,
+        getDateInfo: getDateInfo_reddit
+    },
+    {
+        re: /^https?:\/\/forums\.somethingawful\.com\/showthread\.php/,
+        getDateInfo: getDateInfo_saforumsThread
+    },
+    {
+        re: /^https?:\/\/forums\.somethingawful\.com\/forumdisplay\.php/,
+        getDateInfo: getDateInfo_saforumsForum
+    },
+    {
+        getDateInfo: getDateInfo_mediawiki
+    },
+    {
+        getDateInfo: getDateInfo_documentURL
+    },
+    {
+        getDateInfo: getDateInfo_time
+    },
+    {
+        getDateInfo: getDateInfo_title
+    },
+    {
+        getDateInfo: getDateInfo_text
+    }
+];
 
 var freshboxStyle = "\
 #freshbox {\
@@ -479,8 +484,55 @@ function displayFreshbox(dateInfo)
     }
 }
 
-function closeFreshbox() {
+function closeFreshbox()
+{
     $('#freshbox').fadeOut('fast');
+}
+
+function getLastModifedFromGoogle(callback, failureCallback)
+{
+    var queryUrl = 'http://www.google.com/search?q=inurl:' + encodeURIComponent(document.URL) + '&as_qdr=y15';
+    GM_xmlhttpRequest({
+        method: 'GET',
+        url: queryUrl,
+        onload: function(response)
+        {
+            var range = document.createRange();
+            var frag = range.createContextualFragment(response.responseText);
+            var doc = document.implementation.createHTMLDocument(null);
+            doc.adoptNode(frag);
+            doc.documentElement.appendChild(frag);
+            try {
+                var dateString = $('li.g', doc).first().find('span.f').get(0).textContent;
+                var date = parseDate(dateString);
+                if (date)
+                {
+                    callback({
+                        date: date,
+                        text: "Google",
+                        url: queryUrl});
+                }
+                else
+                {
+                    failureCallback();
+                }
+            }
+            catch (e) {}
+        }
+    });
+}
+
+function showGoogleLookupButton()
+{
+    $('#freshbox')
+        .addClass('freshbox_deferred')
+        .append('<input id="freshbox_lookupBtn" type="button" value="Get date from Google"></input>')
+        .removeClass('freshbox_hidden');
+    $('#freshbox_lookupBtn')
+        .click(function(event) {
+            $(this).hide();
+            getLastModifedFromGoogle(displayFreshbox, closeFreshbox);
+        });
 }
 
 if (window.top == window.self)
@@ -494,11 +546,12 @@ if (window.top == window.self)
         for (var i = 0; i < extractors.length; i++)
         {
             var extractor = extractors[i];
-            if (!site.re || site.re.test(document.URL))
-                try // allow site-specific handlers to fail in case a site changes
+            if (!extractor.re || extractor.re.test(document.URL))
+            {
+                try
                 {
-                    dateInfo = extractor.getDate();
-                    break;
+                    dateInfo = extractor.getDateInfo();
+                    if (dateInfo) break;
                 }
                 catch (e) {}
             }
