@@ -5,9 +5,43 @@
 // @require        http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js
 // ==/UserScript==
 
-var showDateSource = false;
+var showDateSource = true;
 var showRelativeDate = true;
 var allowGoogleFallback = true;
+
+var siteSpecializations = [
+    {
+        re: /^https?:\/\/(?:www\.)?reddit\.com\//,
+        handler: redditFindPageDate
+    }
+];
+
+function redditFindPageDate()
+{
+    var linkinfoJQ = $('.linkinfo');
+    if (linkinfoJQ.size())
+    {
+        var linkinfo = linkinfoJQ.get(0);
+        return dateInfoFromElem(parseDate(linkinfo.childNodes[0].textContent), 'Reddit (post info)', linkinfo);
+    }
+    // use most recently submitted time in content div
+    var timeElems = $('.content time[datetime]').toArray();
+    if (timeElems.length === 0) return null;
+    GM_log(timeElems.length);
+    var newestDateElem = timeElems[0];
+    var newestDate = parseDate(newestDateElem.attributes['datetime'].value);
+    for (var i = 1; i < timeElems.length; i++)
+    {
+        var elem = timeElems[i];
+        var date = parseDate(elem.attributes['datetime'].value);
+        if (date > newestDate)
+        {
+            newestDate = date;
+            newestDateElem = elem;
+        }
+    }
+    return dateInfoFromElem(newestDate, 'Reddit (newest post on page)', newestDateElem);
+}
 
 function getLastModifedFromGoogle(callback, failureCallback)
 {
@@ -211,6 +245,19 @@ function dateInfoFromElem(date, text, elem)
     };
 }
 
+function xpath(expr, node, doc)
+{
+    if (!node) node = document;
+    if (!doc) doc = document;
+    var snapshot = doc.evaluate(expr, node, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    var nodes = [];
+    for (var i = 0; i < snapshot.snapshotLength; i++)
+    {
+        nodes.push(snapshot.snapshotItem(i));
+    }
+    return nodes;
+}
+
 function findPageDate()
 {
     var date = parseDate(document.URL);
@@ -219,36 +266,32 @@ function findPageDate()
         return dateInfoFromElem(date, 'document URL', null);
     }
     
-    var timeNodes = document.evaluate('//time[@datetime]', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-    for (var i = 0; i < timeNodes.snapshotLength; i++)
+    var timeElems = xpath('//time[@datetime]');
+    for (var i = 0; i < timeElems.length; i++)
     {
-        var node = timeNodes.snapshotItem(i);
-        var date = parseDate(node.attributes['datetime'].value);
+        var elem = timeElems[i];
+        var date = parseDate(elem.attributes['datetime'].value);
         if (!date) continue;
-        return dateInfoFromElem(date, 'time element', node.parentNode);
+        return dateInfoFromElem(date, 'time element', elem.parentElem);
     }
     
-    var titleAttrNodes = document.evaluate('//*[@title]', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-    for (var i = 0; i < titleAttrNodes.snapshotLength; i++)
+    var titleAttrElems = xpath('//*[@title]');
+    for (var i = 0; i < titleAttrElems.length; i++)
     {
-        var node = titleAttrNodes.snapshotItem(i);
-        var date = parseDate(node.attributes['title'].value);
+        var elem = titleAttrElems[i];
+        var date = parseDate(elem.attributes['title'].value);
         if (!date) continue;
-        return dateInfoFromElem(date, 'title attribute', node);
+        return dateInfoFromElem(date, 'title attribute', elem);
     }
     
-    var textNodes = document.evaluate('//text()', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-    for (var i = 0; i < textNodes.snapshotLength; i++)
+    var textNodes = xpath('//text()');
+    for (var i = 0; i < textNodes.length; i++)
     {
-        var node = textNodes.snapshotItem(i);
+        var node = textNodes[i];
         if (!(node instanceof Text)) continue;
         var date = parseDate(node.data);
         if (!date) continue;
-        if (!node.id)
-        {
-            node.id = Math.random();
-        }
-        return dateInfoFromElem(date, 'document text', node);
+        return dateInfoFromElem(date, 'document text', node.parentNode);
     }
     
     return null;
@@ -406,7 +449,22 @@ if (window.top == window.self)
     {
         $('body').append('<div id="freshbox" class="freshbox_hidden"><div id="freshbox_close">&#x2716;</div></div>');
         $('#freshbox_close').click(closeFreshbox);
-        var dateInfo = findPageDate();
+        var dateInfo = null;
+        GM_log(document.URL);
+        for (var i = 0; i < siteSpecializations.length; i++)
+        {
+            var site = siteSpecializations[i];
+            var match = site.re.test(document.URL);
+            if (match)
+            {
+                dateInfo = site.handler();
+                break;
+            }
+        }
+        if (!dateInfo)
+        {
+            dateInfo = findPageDate();
+        }
         if (dateInfo)
         {
             displayFreshbox(dateInfo);
