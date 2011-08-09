@@ -5,7 +5,7 @@
 // @require        http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js
 // ==/UserScript==
 
-var showDateSource = true;
+var showDateSource = false;
 var showRelativeDate = true;
 var allowGoogleFallback = true;
 
