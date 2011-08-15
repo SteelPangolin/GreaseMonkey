@@ -3,7 +3,7 @@
 // @namespace      http://bat-country.us/
 // @include        *
 // @require        http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js
-// @resource       commonStyles https://https://github.com/SteelPangolin/GreaseMonkey/raw/master/commonStyles.css?1
+// @resource       commonStyles https://github.com/SteelPangolin/GreaseMonkey/raw/master/commonStyles.css?1
 // ==/UserScript==
 
 var showDateSource = false;
