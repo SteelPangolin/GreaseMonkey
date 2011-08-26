@@ -6,9 +6,15 @@
 // @resource       commonStyles https://github.com/SteelPangolin/GreaseMonkey/raw/master/commonStyles.css?1
 // ==/UserScript==
 
-var showDateSource = false;
-var showRelativeDate = true;
-var allowGoogleFallback = true;
+String.prototype.startsWith = function(str)
+{
+    return this.slice(0, str.length) === str;
+};
+
+String.prototype.endsWith = function(str)
+{
+    return this.slice(-str.length) === str;
+};
 
 var months = [
     'January',
@@ -144,337 +150,218 @@ function parseDate(str)
     return null;
 }
 
-function dateInfoFromElem(date, text, elem)
+function colorForDate(date)
 {
-    if (!date) return null;
-    var url;
-    if (!elem)
+    if (date === null)
     {
-        url = '#';
+        return '#88c';
     }
-    else
-    {
-        if (!elem.id) // give the element an id if it doesn't have one
-        {
-            elem.id = Math.random();
-        }
-        url = '#' + encodeURIComponent(elem.id);
-    }
-    return {
-        date: date,
-        text: text,
-        url: url
-    };
-}
-
-function dateInfoFromNewest(elems, extractDateString, text)
-{
-    if (elems.jquery) elems = elems.toArray();
-    var newestDateElem = elems[0];
-    var newestDate = parseDate(extractDateString(newestDateElem));
-    for (var i = 1; i < elems.length; i++)
-    {
-        var elem = elems[i];
-        var date = parseDate(extractDateString(elem));
-        if (date > newestDate)
-        {
-            newestDate = date;
-            newestDateElem = elem;
-        }
-    }
-    return dateInfoFromElem(newestDate, text, newestDateElem);
-}
-
-function dateInfoFromFirst(elems, extractDateString, text)
-{
-    if (elems.jquery) elems = elems.toArray();
-    return dateInfoFromElem(parseDate(extractDateString(elems[0])), text, elems[0]);
-}
-
-function xpath(expr, node, doc)
-{
-    if (!node) node = document;
-    if (!doc) doc = document;
-    var snapshot = doc.evaluate(expr, node, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-    var nodes = [];
-    for (var i = 0; i < snapshot.snapshotLength; i++)
-    {
-        nodes.push(snapshot.snapshotItem(i));
-    }
-    return nodes;
-}
-
-function getTextContent(elem) {
-    return elem.textContent;
-}
-
-function getDateInfo_documentURL()
-{
-    return dateInfoFromElem(parseDate(document.URL), 'document URL', null);
-}
-
-function getDateInfo_time()
-{
-    var timeElems = xpath('//time[@datetime]');
-    for (var i = 0; i < timeElems.length; i++)
-    {
-        var elem = timeElems[i];
-        var date = parseDate(elem.attributes['datetime'].value);
-        if (!date) continue;
-        return dateInfoFromElem(date, 'time element', elem.parentElem);
-    }
-    return null;
-}
-
-function getDateInfo_title()
-{
-    var titleAttrElems = xpath('//*[@title]');
-    for (var i = 0; i < titleAttrElems.length; i++)
-    {
-        var elem = titleAttrElems[i];
-        var date = parseDate(elem.attributes['title'].value);
-        if (!date) continue;
-        return dateInfoFromElem(date, 'title attribute', elem);
-    }
-    return null;
-}
-
-function getDateInfo_text()
-{
-    var textNodes = xpath('//text()');
-    for (var i = 0; i < textNodes.length; i++)
-    {
-        var node = textNodes[i];
-        if (!(node instanceof Text)) continue;
-        var date = parseDate(node.data);
-        if (!date) continue;
-        return dateInfoFromElem(date, 'document text', node.parentNode);
-    }
-    return null;
-}
-
-function getDateInfo_reddit()
-{
-    // if a post's link info box is available, use that
-    var linkinfoJQ = $('.linkinfo');
-    if (linkinfoJQ.size())
-    {
-        var linkinfo = linkinfoJQ.get(0);
-        return dateInfoFromElem(
-            parseDate(linkinfo.childNodes[0].textContent),
-            'Reddit (post info)',
-            linkinfo);
-    }
-    // otherwise, use most recently submitted time in content div
-    return dateInfoFromNewest(
-        $('.content time[datetime]'),
-        function(elem) { return elem.attributes['datetime'].value; },
-        'Reddit (newest post on page)');
-}
-
-function getDateInfo_saforumsThread()
-{
-    var postdate = $('.postdate').get(-1);
-    return dateInfoFromElem(
-        parseDate(postdate.textContent),
-        'SomethingAwful Forums (newest post on page)',
-        postdate);
-}
-
-function getDateInfo_saforumsForum()
-{
-    return dateInfoFromNewest(
-        $('.date'),
-        getTextContent,
-        'SomethingAwful Forums (newest thread on page)');
-}
-
-var mediawikiLastmodSelectors = [
-    '#footer-info-lastmod',
-    '#lastmod'
-];
-function getDateInfo_mediawiki()
-{
-    for (var i = 0; i < mediawikiLastmodSelectors.length; i++)
-    {
-        var lastmod = $(mediawikiLastmodSelectors[i]);
-        if (lastmod.size())
-        {
-            return dateInfoFromFirst(
-                lastmod,
-                getTextContent,
-                'MediaWiki last modified date');
-        }
-    }
-    return null;
-}
-
-var extractors = [
-    {
-        re: /^https?:\/\/(?:www\.)?reddit\.com\//,
-        getDateInfo: getDateInfo_reddit
-    },
-    {
-        re: /^https?:\/\/forums\.somethingawful\.com\/showthread\.php/,
-        getDateInfo: getDateInfo_saforumsThread
-    },
-    {
-        re: /^https?:\/\/forums\.somethingawful\.com\/forumdisplay\.php/,
-        getDateInfo: getDateInfo_saforumsForum
-    },
-    {
-        getDateInfo: getDateInfo_mediawiki
-    },
-    {
-        getDateInfo: getDateInfo_documentURL
-    },
-    {
-        getDateInfo: getDateInfo_time
-    },
-    {
-        getDateInfo: getDateInfo_title
-    },
-    {
-        getDateInfo: getDateInfo_text
-    }
-];
-
-function displayFreshbox(dateInfo)
-{
     var today = new Date();
-    var ageInDays = Math.floor((today - dateInfo.date) / (24 * 60 * 60 * 1000));
+    var ageInDays = Math.floor((today - date) / (24 * 60 * 60 * 1000));
     if (ageInDays < 0)
     {
         // happens because we currently ignore time and timezone info
         ageInDays = 0;
     }
-    var freshnessClass;
-    var unitName;
-    var unitDays;
-    if (ageInDays < 7)
+    if (ageInDays <= 1)
     {
-        freshnessClass = 'freshbox_pastWeek';
-        unitName = "day";
-        unitDays = 1;
+        return '#8c8';
     }
-    else if (ageInDays < 30)
+    else if (ageInDays <= 7)
     {
-        freshnessClass = 'freshbox_pastMonth';
-        unitName = "week";
-        unitDays = 7;
-    }
-    else if (ageInDays < 365)
-    {
-        freshnessClass = 'freshbox_pastYear';
-        unitName = "month";
-        unitDays = 30;
+        return '#cc8';
     }
     else
     {
-        freshnessClass = 'freshbox_old';
-        unitName = "year";
-        unitDays = 365;
-    }
-    units = Math.floor(ageInDays / unitDays);
-    var dateString;
-    if (showRelativeDate)
-    {
-        dateString = units + " " + unitName + (units === 1 ? "" : "s") + " old";
-    }
-    else
-    {
-        dateString = dateInfo.date.toDateString();
-    }
-    $('#freshbox')
-        .append(dateString)
-        .addClass(freshnessClass)
-        .removeClass('freshbox_deferred')
-        .removeClass('freshbox_hidden');
-    if (showDateSource)
-    {
-        $('#freshbox').append('<br/><a id="#freshbox_source" href="' + dateInfo.url + '">' + dateInfo.text + '</a>');
+        return '#c88';
     }
 }
 
-function closeFreshbox()
+function markDatedItems(datedItemType)
 {
-    $('#freshbox').fadeOut('fast');
+    
 }
 
-function getLastModifedFromGoogle(callback, failureCallback)
+var datedItemTypes = [
+    { // Reddit post or comment
+        itemSelector: '.thing',
+        dateSelector: 'time',
+        dateAttr: 'datetime'
+    },
+    { // Facebook post
+        itemSelector: '.uiUnifiedStory',
+        dateSelector: 'abbr[data-date]',
+        dateAttr: 'data-date'
+    },
+    { // Facebook comment
+        itemSelector: '.uiUfiComment',
+        dateSelector: 'abbr[data-date]',
+        dateAttr: 'data-date'
+    },
+    { // G+ post
+        itemSelector: '.ke',
+        dateSelector: '.Fl',
+        dateAttr: 'title'
+    },
+    { // G+ comment
+        itemSelector: '.zw',
+        dateSelector: '.Fl',
+        dateAttr: 'title'
+    },
+    { // MDC wiki
+        itemSelector: '#content',
+        dateSelector: '.last-mod a',
+        dateAttr: 'title'
+    },
+    { // CNN blog article
+        itemSelector: '.cnnPostWrap',
+        dateSelector: '.cnnBlogContentDateHead',
+        dateAttr: 'text()'
+    },
+    { // CNN blog comment
+        itemSelector: '.cnn_special_comment',
+        dateSelector: '.commentFooter',
+        dateAttr: 'text()'
+    },
+    { // Yahoo News article
+        itemSelector: '.yom-primary',
+        dateSelector: '.byline abbr',
+        dateAttr: 'title'
+    },
+    { // Yahoo News comment
+        itemSelector: '.ugccmt-comment',
+        dateSelector: '.ugccmt-timestamp abbr',
+        dateAttr: 'title'
+    },
+    { // StackOverflow question
+        itemSelector: '#question',
+        dateSelector: '.user-action-time .relativetime', // modification date, creation date also available
+        dateAttr: 'title'
+    },
+    { // StackOverflow answer
+        itemSelector: '.answer',
+        dateSelector: '.user-action-time .relativetime', // modification date, creation date also available
+        dateAttr: 'title'
+    },
+    { // StackOverflow comment
+        itemSelector: '.comment',
+        dateSelector: '.comment-date',
+        dateAttr: 'title'
+    },
+    { // Amazon helpful review
+        itemSelector: '#customerReviews td > div',
+        dateSelector: 'nobr',
+        dateAttr: 'text()'
+    },
+    { // Amazon recent review
+    // TODO: doesn't work
+        itemSelector: '#customerReviews td > div',
+        dateSelector: '.tiny',
+        dateAttr: 'text()' // TODO: relative date
+    },
+    { // Twitter
+        itemSelector: '.tweet',
+        dateSelector: '._timestamp',
+        dateAttr: 'data-time' // TODO: POSIX timestamp?
+    },
+    { // YouTube search results
+        itemSelector: '.result-item',
+        dateSelector: '.date-added',
+        dateAttr: 'text()' // TODO: relative date
+    },
+    { // YouTube video
+        itemSelector: '#watch-container',
+        dateSelector: '#eow-date',
+        dateAttr: 'text()'
+    },
+    { // YouTube comment
+        itemSelector: '.comment-container',
+        dateSelector: '.time',
+        dateAttr: 'text()' // TODO: relative date
+    },
+    { // MediaWiki
+        itemSelector: 'body',
+        dateSelector: '#footer-info-lastmod, #lastmod',
+        dateAttr: 'text()',
+        hiliteSelector: '#content'
+    },
+    { // MSDN blog post, comment
+        itemSelector: '.full-post',
+        dateSelector: '.post-date .value',
+        dateAttr: 'text()'
+    },
+    { // MSDN documentation comment
+        itemSelector: '.Annotation',
+        dateSelector: '.AnnotationAddedContainer .AddedUserData', // modified date in AnnotationEditedContainer
+        dateAttr: 'text()'
+    },
+    { // SomethingAwful Forums thread
+        itemSelector: '.thread',
+        dateSelector: '.lastpost',
+        dateAttr: 'text()'
+    },
+    { // SomethingAwful Forums post
+        itemSelector: '.post',
+        dateSelector: '.postdate',
+        dateAttr: 'text()'
+    },
+    { // SomethingAwful article
+        // TODO: doesn't work
+        itemSelector: '#content',
+        dateSelector: '.byline',
+        dateAttr: 'text()'
+    },
+    { // Google result
+        itemSelector: '.vsc',
+        dateSelector: '.f',
+        dateAttr: 'text()'
+    },
+];
+
+function markDatedItems()
 {
-    var queryUrl = 'http://www.google.com/search?q=inurl:' + encodeURIComponent(document.URL) + '&as_qdr=y15';
-    GM_xmlhttpRequest({
-        method: 'GET',
-        url: queryUrl,
-        onload: function(response)
+    for (var i = 0; i < datedItemTypes.length; i++)
+    {
+        var datedItemType = datedItemTypes[i];
+        $(datedItemType.itemSelector).each(function (index, item)
         {
-            var range = document.createRange();
-            var frag = range.createContextualFragment(response.responseText);
-            var doc = document.implementation.createHTMLDocument(null);
-            doc.adoptNode(frag);
-            doc.documentElement.appendChild(frag);
-            try {
-                var dateString = $('li.g', doc).first().find('span.f').get(0).textContent;
-                var date = parseDate(dateString);
-                if (date)
-                {
-                    callback({
-                        date: date,
-                        text: "Google",
-                        url: queryUrl});
-                }
-                else
-                {
-                    failureCallback();
-                }
+            if ($(item).data('freshboxVisited')) return;
+            $(item).data('freshboxVisited', true)
+            var dateSource = $(item).find(datedItemType.dateSelector).first();
+            if (dateSource.size() === 0) return;
+            var dateStr;
+            if (datedItemType.dateAttr === 'text()')
+            {
+                dateStr = dateSource.text();
             }
-            catch (e) {}
-        }
-    });
-}
-
-function showGoogleLookupButton()
-{
-    $('#freshbox')
-        .addClass('freshbox_deferred')
-        .append('<input id="freshbox_lookupBtn" type="button" value="Get date from Google"></input>')
-        .removeClass('freshbox_hidden');
-    $('#freshbox_lookupBtn')
-        .click(function(event) {
-            $(this).hide();
-            getLastModifedFromGoogle(displayFreshbox, closeFreshbox);
+            else if (datedItemType.dateAttr.startsWith('data-'))
+            {
+                dateStr = dateSource.data(datedItemType.dateAttr.slice(5));
+            }
+            else
+            {
+                dateStr = dateSource.attr(datedItemType.dateAttr);
+            }
+            var date = parseDate(dateStr);
+            $(item).data('freshboxDate', date);
+            var hilite;
+            if (datedItemType.hiliteSelector)
+            {
+                hilite = $(datedItemType.hiliteSelector);
+            }
+            else
+            {
+                hilite = $(item);
+            }
+            hilite.css('box-shadow', 'inset 3px 3px 3px ' + colorForDate(date));
         });
+    }
 }
 
 if (window.top == window.self)
 {
     GM_addStyle(GM_getResourceText('commonStyles'));
-    $(document).ready(function()
-    {
-        $('body').append('<div id="freshbox" class="freshbox_hidden"><div id="freshbox_close">&#x2716;</div></div>');
-        $('#freshbox_close').click(closeFreshbox);
-        var dateInfo = null;
-        for (var i = 0; i < extractors.length; i++)
-        {
-            var extractor = extractors[i];
-            if (!extractor.re || extractor.re.test(document.URL))
-            {
-                try
-                {
-                    dateInfo = extractor.getDateInfo();
-                    if (dateInfo) break;
-                }
-                catch (e) {}
-            }
-        }
-        if (dateInfo)
-        {
-            displayFreshbox(dateInfo);
-        }
-        else if (allowGoogleFallback)
-        {
-            showGoogleLookupButton();
-        }
-    });
+    $(document)
+        .ready(markDatedItems)
+        .bind('DOMNodeInserted', markDatedItems);
 }
