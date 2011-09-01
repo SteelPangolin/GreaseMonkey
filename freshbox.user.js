@@ -3,6 +3,7 @@
 // @namespace      http://bat-country.us/
 // @include        *
 // @require        http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js
+// @require        http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.1.6/underscore-min.js
 // @resource       commonStyles https://github.com/SteelPangolin/GreaseMonkey/raw/master/commonStyles.css?1
 // ==/UserScript==
 
@@ -15,6 +16,191 @@ String.prototype.endsWith = function(str)
 {
     return this.slice(-str.length) === str;
 };
+
+String.prototype.format = function()
+{
+    var re = /{(\d+)}/g;
+    var sb = [];
+    var match;
+    var s = 0;
+    while ((match = re.exec(this)))
+    {
+        sb.push(this.slice(s, match.index));
+        s = re.lastIndex;
+        sb.push(arguments[parseInt(match[1], 10)]);
+    }
+    sb.push(this.slice(s));
+    return sb.join('');
+};
+
+function hsv2rgb(hsv)
+{
+    var h, s, v;
+    [h, s, v] = hsv;
+    var hPrime = 3 * h / Math.PI;
+    var c = s * v;
+    var x = c * (1 - Math.abs((hPrime % 2) - 1));
+    var m = v - c;
+    var r = m, g = m, b = m;
+    switch (Math.floor(hPrime))
+    {
+    case 0:
+        r += c;
+        g += x;
+        break;
+    case 1:
+        r += x;
+        g += c;
+        break;
+    case 2:
+        g += c;
+        b += x;
+        break;
+    case 3:
+        g += x;
+        b += c;
+        break;
+    case 4:
+        r += x;
+        b += c;
+        break;
+    case 5:
+        r += c;
+        b += x;
+        break;
+    }
+    return [r, g, b];
+}
+
+function rgb2hsv(rgb)
+{
+    var r, g, b;
+    [r, g, b] = rgb;
+    var M = _.max(rgb);
+    var m = _.min(rgb);
+    var c = M - m;
+    var v = M;
+    var s;
+    if (M > 0)
+    {
+        s = c / v;
+    }
+    else
+    {
+        s = 0;
+    }
+    var hPrime;
+    if (c === 0)
+    {
+        hPrime = 0;
+    }
+    else if (r === M)
+    {
+        hPrime = 0 + (g - b) / c;
+    }
+    else if (g === M)
+    {
+        hPrime = 2 + (b - r) / c;
+    }
+    else
+    {
+        hPrime = 4 + (r - g) / c;
+    }
+    var h = wrap(hPrime, 0, 6) * Math.PI / 3;
+    return [h, s, v];
+}
+
+function clamp(x, a, b)
+{
+    return Math.min(Math.max(x, a), b);
+}
+
+function wrap(x, a, b)
+{
+    var d = b - a;
+    var m = (x - a) % d;
+    if (m < 0)
+    {
+        m += d;
+    }
+    return m + a;
+}
+
+function lerp(x, a, b)
+{
+    return (1 - x) * a + x * b;
+}
+
+function interpolateAngle(x, a, b)
+{
+    if (a < b)
+    {
+        if (b - a < a + 2 * Math.PI - b)
+        {
+            z = lerp(x, a, b);
+        }
+        else
+        {
+            z = lerp(x, a + 2 * Math.PI, b);
+        }
+    }
+    else
+    {
+        if (a - b < b + 2 * Math.PI - a)
+        {
+            z = lerp(x, a, b);
+        }
+        else
+        {
+            z = lerp(x, a, b + 2 * Math.PI);
+        }
+    }
+    return z;
+}
+
+function interpolateHSV(x, hsv1, hsv2)
+{
+    var h1, s1, v1, h2, s2, v2;
+    [h1, s1, v1] = hsv1;
+    [h2, s2, v2] = hsv2;
+    return [
+        interpolateAngle(x, h1, h2),
+        lerp(x, s1, s2),
+        lerp(x, v1, v2)
+    ];
+}
+
+function rgb2css(rgb)
+{
+    var sb = ['#'];
+    for (var i = 0; i < 3; i++)
+    {
+        var x = Math.floor(rgb[i] * 0xff);
+        if (x < 0x10) sb.push('0');
+        sb.push(x.toString(16));
+    }
+    return sb.join('');
+}
+
+function css2rgb(css)
+{
+    var rgb = [];
+    if (css.length === 4) // assume #xxx
+    {
+        for (var i = 1; i < 4; i++)
+        {
+            rgb.push(parseInt(css[i], 16) / 15.0);
+        }
+    }
+    else // assume #xxxxxx
+    {
+        for (var i = 1; i < 7; i++)
+        {
+            rgb.push(parseInt(css.slice(i, i + 2), 16) / 255.0);
+        }
+    }
+    return rgb;
+}
 
 var months = [
     'January',
@@ -33,22 +219,22 @@ var months = [
 
 var monthGroupPat = function()
 {
-    var chunks = [];
-    chunks.push('(');
+    var sb = [];
+    sb.push('(');
     for (var i = 0; i < months.length; i++)
     {
-        if (i > 0) chunks.push('|');
+        if (i > 0) sb.push('|');
         var month = months[i];
-        chunks.push(month.substring(0, 3));
+        sb.push(month.substring(0, 3));
         if (month.length > 3)
         {
-            chunks.push('(?:');
-            chunks.push(month.substring(3));
-            chunks.push(')?');
+            sb.push('(?:');
+            sb.push(month.substring(3));
+            sb.push(')?');
         }
     }
-    chunks.push(')');
-    return chunks.join('');
+    sb.push(')');
+    return sb.join('');
 }();
 
 function lookupMonth(month)
@@ -76,10 +262,10 @@ function isValidDay(d)
     return 1 <= d && d <= 31;
 }
 
-var date1RE = /\b(\d{4})([\/.-])(\d{2})\2(\d{2})(?:\b|T)/i; // YYYY-MM-DD, YYYY/DD/MM
-function parseDate1(str)
+var yearFirstRE = /\b(\d{4})([\/.-])(\d{1,2})\2(\d{1,2})(?:\b|T)/i; // YYYY-MM-DD, YYYY/DD/MM
+function parseYearFirstDate(str)
 {
-    var match = date1RE.exec(str);
+    var match = yearFirstRE.exec(str);
     if (!match) return null;
     var m = parseInt(match[3], 10) - 1;
     var y = parseInt(match[1], 10);
@@ -87,10 +273,10 @@ function parseDate1(str)
     return parseDateUnknownMMDDOrder(y, m, d);
 }
 
-var date2RE = /\b(\d{2})([\/.-])(\d{2})\2(\d{4})\b/i; // MM/DD/YYYY, DD-MM-YYYY
-function parseDate2(str)
+var yearLastRE = /\b(\d{1,2})([\/.-])(\d{1,2})\2(\d{4})\b/i; // MM/DD/YYYY, DD-MM-YYYY
+function parseYearLastDate(str)
 {
-    var match = date2RE.exec(str);
+    var match = yearLastRE.exec(str);
     if (!match) return null;
     var m = parseInt(match[1], 10) - 1;
     var d = parseInt(match[3], 10);
@@ -111,10 +297,10 @@ function parseDateUnknownMMDDOrder(y, m, d)
     return new Date(y, m, d);
 }
 
-var date3RE = new RegExp('\\b' + monthGroupPat + '.? (\\d{1,2})(?:st|nd|rd|th)?,? (\\d{4})\\b', 'i'); // Mon. DDst, YYYY
-function parseDate3(str)
+var mdyLongDateRE = new RegExp('\\b' + monthGroupPat + '.? (\\d{1,2})(?:st|nd|rd|th)?,? (\\d{4})\\b', 'i'); // Mon. DDst, YYYY
+function parseMDYLongDate(str)
 {
-    var match = date3RE.exec(str);
+    var match = mdyLongDateRE.exec(str);
     if (!match) return null;
     var m = lookupMonth(match[1]);
     if (m === null) return null;
@@ -125,10 +311,10 @@ function parseDate3(str)
     return new Date(y, m, d);
 }
 
-var date4RE = new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)? ' + monthGroupPat + '.?,? (\\d{4})\\b', 'i'); // DDst Month, YYYY
-function parseDate4(str)
+var dmyLongDateRE = new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)? ' + monthGroupPat + '.?,? (\\d{4})\\b', 'i'); // DDst Month, YYYY
+function parseDMYLongDate(str)
 {
-    var match = date4RE.exec(str);
+    var match = dmyLongDateRE.exec(str);
     if (!match) return null;
     var d = parseInt(match[1], 10);
     if (!isValidDay(d)) return null;
@@ -139,7 +325,62 @@ function parseDate4(str)
     return new Date(y, m, d);
 }
 
-var dateParsers = [parseDate1, parseDate2, parseDate3, parseDate4];
+
+// will try to parse ANY INTEGER
+function parsePosixTimestamp(str)
+{
+    return new Date(parseInt(str, 10));
+}
+
+var timeUnits = {
+    second: 1000,
+    minute: 60 * 1000,
+    hour: 60 * 60 * 1000,
+    day: 24 * 60 * 60 * 1000,
+    week: 7 * 24 * 60 * 60 * 1000,
+    month: 30 * 24 * 60 * 60 * 1000,
+    year: 365 * 24 * 60 * 60 * 1000,
+    decade: 10 * 365 * 24 * 60 * 60 * 1000,
+};
+
+var timeUnitsGroupPat = function()
+{
+    var sb = [];
+    for (var unit in timeUnits)
+    {
+        if (!timeUnits.hasOwnProperty(unit)) continue;
+        sb.push(unit + 's?');
+    }
+    return '(' + sb.join('|') + ')';
+}();
+
+var relativeDateRE = new RegExp('\\b(\\d+) ' + timeUnitsGroupPat + ' ago\\b', 'i');
+function parseRelativeDate(str)
+{
+    var match = relativeDateRE.exec(str);
+    if (!match) return null;
+    var count = parseInt(match[1], 10);
+    var unit = match[2].toLowerCase();
+    if (unit.endsWith('s')) unit = unit.slice(0, -1);
+    return new Date(Date.now() - count * timeUnits[unit]);
+}
+
+var yesterdayRE = new RegExp('\\byesterday\\b', 'i');
+function parseYesterday(str)
+{
+    var match = yesterdayRE.exec(str);
+    if (!match) return null;
+    return new Date(Date.now() - timeUnits.day);
+}
+
+var dateParsers = [
+    parseYearFirstDate,
+    parseYearLastDate,
+    parseMDYLongDate,
+    parseDMYLongDate,
+    parseRelativeDate,
+    parseYesterday,
+];
 function parseDate(str)
 {
     for (var i = 0; i < dateParsers.length; i++)
@@ -150,218 +391,277 @@ function parseDate(str)
     return null;
 }
 
+var specialDateParsers = {
+    posixTimestamp: parsePosixTimestamp
+};
+
+var stops = [
+    {
+        age_ms: 0,
+        color: '#c8c',
+    },
+    {
+        age_ms: timeUnits.month,
+        color: '#cc8',
+    },
+    {
+        age_ms: timeUnits.year,
+        color: '#c88',
+    },
+    {
+        age_ms: timeUnits.decade,
+        color: '#88c',
+    },
+];
+var veryOldItemColor = '#888';
+
 function colorForDate(date)
 {
-    if (date === null)
+    var age_ms = Math.max(0, Date.now() - date);
+    var stopA, stopB = null;
+    for (var i = 1; i < stops.length; i++)
     {
-        return '#88c';
+        if (stops[i].age_ms > age_ms)
+        {
+            stopA = stops[i - 1]
+            stopB = stops[i];
+            break;
+        }
     }
-    var today = new Date();
-    var ageInDays = Math.floor((today - date) / (24 * 60 * 60 * 1000));
-    if (ageInDays < 0)
+    if (!stopB)
     {
-        // happens because we currently ignore time and timezone info
-        ageInDays = 0;
+        return veryOldItemColor;
     }
-    if (ageInDays <= 1)
-    {
-        return '#8c8';
-    }
-    else if (ageInDays <= 7)
-    {
-        return '#cc8';
-    }
-    else
-    {
-        return '#c88';
-    }
+    var x = (age_ms - stopA.age_ms) / (stopB.age_ms - stopA.age_ms);
+    return rgb2css(hsv2rgb(interpolateHSV(
+        x,
+        rgb2hsv(css2rgb(stopA.color)),
+        rgb2hsv(css2rgb(stopB.color)))));
 }
 
 var datedItemTypes = [
-    { // Reddit post or comment
+    {
+        desc: "Reddit post or comment",
         itemSelector: '.thing',
         dateSelector: 'time',
-        dateAttr: 'datetime'
+        dateAttr: 'datetime',
     },
-    { // Facebook post
+    {
+        desc: "Facebook post",
         itemSelector: '.uiUnifiedStory',
         dateSelector: 'abbr[data-date]',
-        dateAttr: 'data-date'
+        dateAttr: 'data-date',
+        hiliteSelector: '.mainWrapper',
     },
-    { // Facebook comment
+    {
+        desc: "Facebook comment",
         itemSelector: '.uiUfiComment',
         dateSelector: 'abbr[data-date]',
-        dateAttr: 'data-date'
+        dateAttr: 'data-date',
     },
-    { // G+ post
+    {
+        // TODO: doesn't work
+        desc: "G+ post",
         itemSelector: '.ke',
         dateSelector: '.Fl',
-        dateAttr: 'title'
+        dateAttr: 'title',
     },
-    { // G+ comment
+    {
+        // TODO: doesn't work
+        desc: "G+ comment",
         itemSelector: '.zw',
         dateSelector: '.Fl',
-        dateAttr: 'title'
+        dateAttr: 'title',
     },
-    { // MDC wiki
+    {
+        desc: "MDC wiki",
         itemSelector: '#content',
         dateSelector: '.last-mod a',
-        dateAttr: 'title'
+        dateAttr: 'title',
     },
-    { // CNN blog article
+    {
+        desc: "CNN blog article",
         itemSelector: '.cnnPostWrap',
         dateSelector: '.cnnBlogContentDateHead',
-        dateAttr: 'text()'
     },
-    { // CNN blog comment
+    {
+        desc: "CNN blog comment",
         itemSelector: '.cnn_special_comment',
         dateSelector: '.commentFooter',
-        dateAttr: 'text()'
     },
-    { // Yahoo News article
+    {
+        desc: "Yahoo News article",
         itemSelector: '.yom-primary',
         dateSelector: '.byline abbr',
-        dateAttr: 'title'
+        dateAttr: 'title',
     },
-    { // Yahoo News comment
+    {
+        desc: "Yahoo News comment",
         itemSelector: '.ugccmt-comment',
         dateSelector: '.ugccmt-timestamp abbr',
-        dateAttr: 'title'
+        dateAttr: 'title',
     },
-    { // StackOverflow question
+    {
+        desc: "StackOverflow question",
         itemSelector: '#question',
-        dateSelector: '.user-action-time .relativetime', // modification date, creation date also available
-        dateAttr: 'title'
+        dateSelector: '.user-action-time .relativetime',
+        dateAttr: 'title',
     },
-    { // StackOverflow answer
+    {
+        desc: "StackOverflow answer",
         itemSelector: '.answer',
-        dateSelector: '.user-action-time .relativetime', // modification date, creation date also available
-        dateAttr: 'title'
+        dateSelector: '.user-action-time .relativetime',
+        dateAttr: 'title',
     },
-    { // StackOverflow comment
+    {
+        desc: "StackOverflow comment",
         itemSelector: '.comment',
         dateSelector: '.comment-date',
-        dateAttr: 'title'
+        dateAttr: 'title',
     },
-    { // Amazon helpful review
+    {
+        desc: "Amazon helpful review",
         itemSelector: '#customerReviews td > div',
         dateSelector: 'nobr',
-        dateAttr: 'text()'
     },
-    { // Amazon recent review
-    // TODO: doesn't work
+    {
+        // TODO: doesn't work
+        desc: "Amazon recent review",
         itemSelector: '#customerReviews td > div',
         dateSelector: '.tiny',
-        dateAttr: 'text()' // TODO: relative date
     },
-    { // Twitter
+    {
+        desc: "Twitter",
         itemSelector: '.tweet',
         dateSelector: '._timestamp',
-        dateAttr: 'data-time' // TODO: POSIX timestamp?
+        dateAttr: 'data-time',
+        dateParser: 'posixTimestamp',
     },
-    { // YouTube search results
+    {
+        desc: "YouTube search results",
         itemSelector: '.result-item',
         dateSelector: '.date-added',
-        dateAttr: 'text()' // TODO: relative date
     },
-    { // YouTube video
-        itemSelector: '#watch-container',
+    {
+        desc: "YouTube video",
+        itemSelector: 'body',
         dateSelector: '#eow-date',
-        dateAttr: 'text()'
+        hiliteSelector: '#watch-headline',
     },
-    { // YouTube comment
+    {
+        desc: "YouTube comment",
         itemSelector: '.comment-container',
         dateSelector: '.time',
-        dateAttr: 'text()' // TODO: relative date
     },
-    { // MediaWiki
-        itemSelector: 'body',
+    {
+        desc: "MediaWiki",
+        itemSelector: 'body.mediawiki',
         dateSelector: '#footer-info-lastmod, #lastmod',
-        dateAttr: 'text()',
-        hiliteSelector: '#content'
+        hiliteSelector: '#content',
     },
-    { // MSDN blog post, comment
+    {
+        desc: "MSDN blog post, comment",
         itemSelector: '.full-post',
         dateSelector: '.post-date .value',
-        dateAttr: 'text()'
     },
-    { // MSDN documentation comment
+    {
+        desc: "MSDN documentation comment",
         itemSelector: '.Annotation',
-        dateSelector: '.AnnotationAddedContainer .AddedUserData', // modified date in AnnotationEditedContainer
-        dateAttr: 'text()'
+        dateSelector: '.AnnotationAddedContainer .AddedUserData',
     },
-    { // SomethingAwful Forums thread
+    {
+        desc: "SomethingAwful Forums thread",
         itemSelector: '.thread',
         dateSelector: '.lastpost .date',
-        dateAttr: 'text()'
     },
-    { // SomethingAwful Forums post
+    {
+        desc: "SomethingAwful Forums post",
         itemSelector: '.post',
         dateSelector: '.postdate',
-        dateAttr: 'text()'
     },
-    { // SomethingAwful article
-        // TODO: doesn't work
-        itemSelector: '#content',
-        dateSelector: '.byline',
-        dateAttr: 'text()'
-    },
-    { // Google result
+    {
+        desc: "Google result",
         itemSelector: '.vsc',
-        dateSelector: '.f',
-        dateAttr: 'text()'
+        dateSelector: 'span.f',
     },
-    { // Blogger post
+    {
+        desc: "Blogger post",
         itemSelector: '.date-outer',
         dateSelector: '.date-header span',
-        dateAttr: 'text()',
-        hiliteSelector: '.post-body'
+        hiliteSelector: '.post-body',
+    },
+    {
+        desc: "Google Reader",
+        itemSelector: '.entry',
+        dateSelector: '.entry-date',
+        hiliteSelector: '.card',
+    },
+    {
+        desc: "Flickr photo",
+        itemSelector: '#photo-story',
+        dateSelector: '.ywa-track',
+    },
+    {
+        desc: "Flickr comment",
+        itemSelector: '.comment-block',
+        dateSelector: '.comment-date a',
+        dateAttr: 'title',
+    },
+    {
+        desc: "Dropbox",
+        itemSelector: '.browse-file-box-details',
+        dateSelector: '.details-modified',
     },
 ];
 
 function markDatedItems()
 {
-    $(document).unbind('DOMNodeInserted', markDatedItems);
     for (var i = 0; i < datedItemTypes.length; i++)
     {
         var datedItemType = datedItemTypes[i];
         $(datedItemType.itemSelector).each(function (index, item)
         {
-            var dateSource = $(item).find(datedItemType.dateSelector).first();
-            if (dateSource.length === 0) return;
-            var dateStr;
-            if (datedItemType.dateAttr === 'text()')
+            try
             {
-                dateStr = dateSource.text();
+                var dateSource = $(item).find(datedItemType.dateSelector).first();
+                if (dateSource.length === 0) return;
+                var dateStr;
+                if (!datedItemType.dateAttr)
+                {
+                    dateStr = dateSource.text();
+                }
+                else if (datedItemType.dateAttr.startsWith('data-'))
+                {
+                    dateStr = dateSource.data(datedItemType.dateAttr.slice(5));
+                }
+                else
+                {
+                    dateStr = dateSource.attr(datedItemType.dateAttr);
+                }
+                if (!dateStr) return;
+                var date = specialDateParsers.hasOwnProperty(datedItemType.dateParser)
+                    ? specialDateParsers[datedItemType.dateParser](dateStr)
+                    : parseDate(dateStr);
+                if (!date) return;
+                var color = colorForDate(date);
+                var hilite = datedItemType.hiliteSelector
+                    ? $(datedItemType.hiliteSelector)
+                    : $(item);
+                dateSource.css('border', '2px dotted {0}'.format(color));
+                hilite.css('box-shadow', 'inset 3px 3px 3px {0}'.format(color));
             }
-            else if (datedItemType.dateAttr.startsWith('data-'))
+            catch (exception)
             {
-                dateStr = dateSource.data(datedItemType.dateAttr.slice(5));
+                // pass
             }
-            else
-            {
-                dateStr = dateSource.attr(datedItemType.dateAttr);
-            }
-            var date = parseDate(dateStr);
-            $(item).data('freshboxDate', date);
-            var hilite;
-            if (datedItemType.hiliteSelector)
-            {
-                hilite = $(datedItemType.hiliteSelector);
-            }
-            else
-            {
-                hilite = $(item);
-            }
-            hilite.css('box-shadow', 'inset 3px 3px 3px ' + colorForDate(date));
         });
     }
-    window.setTimeout(function() { $(document).bind('DOMNodeInserted', markDatedItems); }, 100);
 }
 
 if (window.top == window.self)
 {
     GM_addStyle(GM_getResourceText('commonStyles'));
     $(document)
+        .bind('DOMNodeInserted', _.debounce(markDatedItems, 200))
         .ready(markDatedItems);
 }
