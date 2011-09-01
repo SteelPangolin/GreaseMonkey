@@ -177,11 +177,6 @@ function colorForDate(date)
     }
 }
 
-function markDatedItems(datedItemType)
-{
-    
-}
-
 var datedItemTypes = [
     { // Reddit post or comment
         itemSelector: '.thing',
@@ -297,7 +292,7 @@ var datedItemTypes = [
     },
     { // SomethingAwful Forums thread
         itemSelector: '.thread',
-        dateSelector: '.lastpost',
+        dateSelector: '.lastpost .date',
         dateAttr: 'text()'
     },
     { // SomethingAwful Forums post
@@ -316,19 +311,24 @@ var datedItemTypes = [
         dateSelector: '.f',
         dateAttr: 'text()'
     },
+    { // Blogger post
+        itemSelector: '.date-outer',
+        dateSelector: '.date-header span',
+        dateAttr: 'text()',
+        hiliteSelector: '.post-body'
+    },
 ];
 
 function markDatedItems()
 {
+    $(document).unbind('DOMNodeInserted', markDatedItems);
     for (var i = 0; i < datedItemTypes.length; i++)
     {
         var datedItemType = datedItemTypes[i];
         $(datedItemType.itemSelector).each(function (index, item)
         {
-            if ($(item).data('freshboxVisited')) return;
-            $(item).data('freshboxVisited', true)
             var dateSource = $(item).find(datedItemType.dateSelector).first();
-            if (dateSource.size() === 0) return;
+            if (dateSource.length === 0) return;
             var dateStr;
             if (datedItemType.dateAttr === 'text()')
             {
@@ -356,12 +356,12 @@ function markDatedItems()
             hilite.css('box-shadow', 'inset 3px 3px 3px ' + colorForDate(date));
         });
     }
+    window.setTimeout(function() { $(document).bind('DOMNodeInserted', markDatedItems); }, 100);
 }
 
 if (window.top == window.self)
 {
     GM_addStyle(GM_getResourceText('commonStyles'));
     $(document)
-        .ready(markDatedItems)
-        .bind('DOMNodeInserted', markDatedItems);
+        .ready(markDatedItems);
 }
