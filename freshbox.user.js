@@ -33,6 +33,54 @@ String.prototype.format = function()
     return sb.join('');
 };
 
+function clamp(x, a, b)
+{
+    return Math.min(Math.max(x, a), b);
+}
+
+function wrap(x, a, b)
+{
+    var d = b - a;
+    var m = (x - a) % d;
+    if (m < 0)
+    {
+        m += d;
+    }
+    return m + a;
+}
+
+function lerp(x, a, b)
+{
+    return (1 - x) * a + x * b;
+}
+
+function interpolateAngle(x, a, b)
+{
+    if (a < b)
+    {
+        if (b - a < a + 2 * Math.PI - b)
+        {
+            z = lerp(x, a, b);
+        }
+        else
+        {
+            z = lerp(x, a + 2 * Math.PI, b);
+        }
+    }
+    else
+    {
+        if (a - b < b + 2 * Math.PI - a)
+        {
+            z = lerp(x, a, b);
+        }
+        else
+        {
+            z = lerp(x, a, b + 2 * Math.PI);
+        }
+    }
+    return wrap(z, 0, 2 * Math.PI);
+}
+
 function hsv2rgb(hsv)
 {
     var h, s, v;
@@ -108,54 +156,6 @@ function rgb2hsv(rgb)
     }
     var h = wrap(hPrime, 0, 6) * Math.PI / 3;
     return [h, s, v];
-}
-
-function clamp(x, a, b)
-{
-    return Math.min(Math.max(x, a), b);
-}
-
-function wrap(x, a, b)
-{
-    var d = b - a;
-    var m = (x - a) % d;
-    if (m < 0)
-    {
-        m += d;
-    }
-    return m + a;
-}
-
-function lerp(x, a, b)
-{
-    return (1 - x) * a + x * b;
-}
-
-function interpolateAngle(x, a, b)
-{
-    if (a < b)
-    {
-        if (b - a < a + 2 * Math.PI - b)
-        {
-            z = lerp(x, a, b);
-        }
-        else
-        {
-            z = lerp(x, a + 2 * Math.PI, b);
-        }
-    }
-    else
-    {
-        if (a - b < b + 2 * Math.PI - a)
-        {
-            z = lerp(x, a, b);
-        }
-        else
-        {
-            z = lerp(x, a, b + 2 * Math.PI);
-        }
-    }
-    return z;
 }
 
 function interpolateHSV(x, hsv1, hsv2)
@@ -398,7 +398,7 @@ var specialDateParsers = {
 var stops = [
     {
         age_ms: 0,
-        color: '#c8c',
+        color: '#8c8',
     },
     {
         age_ms: timeUnits.month,
@@ -423,7 +423,7 @@ function colorForDate(date)
     {
         if (stops[i].age_ms > age_ms)
         {
-            stopA = stops[i - 1]
+            stopA = stops[i - 1];
             stopB = stops[i];
             break;
         }
@@ -645,7 +645,7 @@ function markDatedItems()
                 if (!date) return;
                 var color = colorForDate(date);
                 var hilite = datedItemType.hiliteSelector
-                    ? $(datedItemType.hiliteSelector)
+                    ? $(item).find(datedItemType.hiliteSelector).first()
                     : $(item);
                 dateSource.css('border', '2px dotted {0}'.format(color));
                 hilite.css('box-shadow', 'inset 3px 3px 3px {0}'.format(color));
