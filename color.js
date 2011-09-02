@@ -71,7 +71,7 @@ function rgb2hsv(rgb)
     {
         hPrime = 4 + (r - g) / c;
     }
-    var h = wrap(hPrime, 0, 6) * Math.PI / 3;
+    var h = Math.wrap(hPrime, 0, 6) * Math.PI / 3;
     return [h, s, v];
 }
 
@@ -81,9 +81,9 @@ function interpolateHSV(x, hsv1, hsv2)
     [h1, s1, v1] = hsv1;
     [h2, s2, v2] = hsv2;
     return [
-        Math.PI + interpolateAngle(x, h1, h2),
-        lerp(x, s1, s2),
-        lerp(x, v1, v2)
+        Math.wrap(Math.interpolateAngle(x, h1, h2), 0, 2 * Math.PI),
+        Math.lerp(x, s1, s2),
+        Math.lerp(x, v1, v2)
     ];
 }
 
