@@ -101,7 +101,6 @@ function markDatedItems()
 
 if (window.top == window.self)
 {
-    GM_addStyle(GM_getResourceText('commonStyles'));
     $(document)
         .bind('DOMNodeInserted', _.debounce(markDatedItems, 200))
         .ready(markDatedItems);
