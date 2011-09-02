@@ -4,82 +4,10 @@
 // @include        *
 // @require        http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js
 // @require        http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.1.6/underscore-min.js
-// @resource       commonStyles https://github.com/SteelPangolin/GreaseMonkey/raw/master/commonStyles.css?1
+// @require        https://raw.github.com/SteelPangolin/jstools/master/string.js
+// @require        https://raw.github.com/SteelPangolin/jstools/master/array.js
+// @require        https://raw.github.com/SteelPangolin/jstools/master/math.js
 // ==/UserScript==
-
-String.prototype.startsWith = function(str)
-{
-    return this.slice(0, str.length) === str;
-};
-
-String.prototype.endsWith = function(str)
-{
-    return this.slice(-str.length) === str;
-};
-
-String.prototype.format = function()
-{
-    var re = /{(\d+)}/g;
-    var sb = [];
-    var match;
-    var s = 0;
-    while ((match = re.exec(this)))
-    {
-        sb.push(this.slice(s, match.index));
-        s = re.lastIndex;
-        sb.push(arguments[parseInt(match[1], 10)]);
-    }
-    sb.push(this.slice(s));
-    return sb.join('');
-};
-
-function clamp(x, a, b)
-{
-    return Math.min(Math.max(x, a), b);
-}
-
-function wrap(x, a, b)
-{
-    var d = b - a;
-    var m = (x - a) % d;
-    if (m < 0)
-    {
-        m += d;
-    }
-    return m + a;
-}
-
-function lerp(x, a, b)
-{
-    return (1 - x) * a + x * b;
-}
-
-function interpolateAngle(x, a, b)
-{
-    if (a < b)
-    {
-        if (b - a < a + 2 * Math.PI - b)
-        {
-            z = lerp(x, a, b);
-        }
-        else
-        {
-            z = lerp(x, a + 2 * Math.PI, b);
-        }
-    }
-    else
-    {
-        if (a - b < b + 2 * Math.PI - a)
-        {
-            z = lerp(x, a, b);
-        }
-        else
-        {
-            z = lerp(x, a, b + 2 * Math.PI);
-        }
-    }
-    return wrap(z, 0, 2 * Math.PI);
-}
 
 function hsv2rgb(hsv)
 {
@@ -164,7 +92,7 @@ function interpolateHSV(x, hsv1, hsv2)
     [h1, s1, v1] = hsv1;
     [h2, s2, v2] = hsv2;
     return [
-        interpolateAngle(x, h1, h2),
+        Math.PI + interpolateAngle(x, h1, h2),
         lerp(x, s1, s2),
         lerp(x, v1, v2)
     ];
@@ -182,6 +110,9 @@ function rgb2css(rgb)
     return sb.join('');
 }
 
+/**
+ * Handles a subset of CSS color specs.
+ */
 function css2rgb(css)
 {
     var rgb = [];
@@ -326,7 +257,9 @@ function parseDMYLongDate(str)
 }
 
 
-// will try to parse ANY INTEGER
+/**
+ * Will return a value for any non-negative integer, not suitable for free-text parsing.
+ */
 function parsePosixTimestamp(str)
 {
     return new Date(parseInt(str, 10));
@@ -413,7 +346,6 @@ var stops = [
         color: '#88c',
     },
 ];
-var veryOldItemColor = '#888';
 
 function colorForDate(date)
 {
@@ -430,7 +362,7 @@ function colorForDate(date)
     }
     if (!stopB)
     {
-        return veryOldItemColor;
+        return stops.get(-1).color;
     }
     var x = (age_ms - stopA.age_ms) / (stopB.age_ms - stopA.age_ms);
     return rgb2css(hsv2rgb(interpolateHSV(
