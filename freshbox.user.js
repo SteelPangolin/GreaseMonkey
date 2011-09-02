@@ -85,6 +85,7 @@ function markDatedItems()
                     : parseDate(dateStr);
                 if (!date) return;
                 var color = colorForDate(date);
+                GM_log('color = ' + color);
                 var hilite = datedItemType.hiliteSelector
                     ? $(item).find(datedItemType.hiliteSelector).first()
                     : $(item);
@@ -93,7 +94,7 @@ function markDatedItems()
             }
             catch (exception)
             {
-                // pass
+                GM_log(exception);
             }
         });
     }
