@@ -1,4 +1,3 @@
-
 var months = [
     'January',
     'February',
@@ -190,5 +189,5 @@ function parseDate(str)
 }
 
 var specialDateParsers = {
-    posixTimestamp: parsePosixTimestamp
+    posixTimestamp: parsePosixTimestamp,
 };
