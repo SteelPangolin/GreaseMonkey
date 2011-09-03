@@ -215,4 +215,9 @@ var datedItemTypes = [
         itemSelector: '.comment',
         dateSelector: '.comment-meta',
     },
+    {
+        desc: "WordPress pingback",
+        itemSelector: '.pingback',
+        dateSelector: '.comment-meta',
+    },
 ];
