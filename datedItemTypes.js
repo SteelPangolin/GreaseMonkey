@@ -19,17 +19,15 @@ var datedItemTypes = [
         dateAttr: 'data-date',
     },
     {
-        // TODO: doesn't work
         desc: "G+ post",
-        itemSelector: '.ke',
-        dateSelector: '.Fl',
+        itemSelector: '.gi',
+        dateSelector: '.hl',
         dateAttr: 'title',
     },
     {
-        // TODO: doesn't work
         desc: "G+ comment",
-        itemSelector: '.zw',
-        dateSelector: '.Fl',
+        itemSelector: '.qx',
+        dateSelector: '.hl',
         dateAttr: 'title',
     },
     {
