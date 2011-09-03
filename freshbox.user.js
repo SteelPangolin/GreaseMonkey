@@ -26,7 +26,7 @@ var stops = [
         color: '#c88',
     },
     {
-        age_ms: timeUnits.decade,
+        age_ms: 5 * timeUnits.year,
         color: '#88c',
     },
 ];

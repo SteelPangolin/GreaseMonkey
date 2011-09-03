@@ -241,4 +241,40 @@ var datedItemTypes = [
         itemSelector: '.pluck-comm-single-comment-main',
         dateSelector: '.pluck-comm-timestamp',
     },
+    {
+        desc: "ABC News",
+        itemSelector: '#story_core',
+        dateSelector: '.byline_date .date',
+    },
+    {
+        desc: "Daily Kos",
+        itemSelector: '.article',
+        dateSelector: '.meta .date',
+    },
+    {
+        desc: "Daily Kos comment",
+        itemSelector: '.cx',
+        dateSelector: '.cb',
+    },
+    {
+        desc: "Daily Kos comment (folded)",
+        itemSelector: '.csx',
+        dateSelector: 'h5',
+    },
+    {
+        desc: "NYT article",
+        itemSelector: '#article',
+        dateSelector: '.dateline',
+    },
+    {
+        desc: "NYT story summary",
+        itemSelector: '.story',
+        dateSelector: '.timestamp',
+        // TODO: sometimes uses time without date instead of relative time
+    },
+    {
+        desc: "NYT comment",
+        itemSelector: '.post',
+        dateSelector: '.meta .date',
+    },
 ];
