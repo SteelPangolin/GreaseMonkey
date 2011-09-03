@@ -171,4 +171,48 @@ var datedItemTypes = [
         itemSelector: '.browse-file-box-details',
         dateSelector: '.details-modified',
     },
+    // http://microformats.org/wiki/hatom
+    // http://microformats.org/wiki/value-class-pattern#Parsing_machine-data_value-title
+    {
+        desc: "hAtom microformat",
+        itemSelector: '.hentry',
+        dateSelector: '.updated',
+    },
+    {
+        desc: "hAtom microformat",
+        itemSelector: '.hentry',
+        dateSelector: '.updated .value',
+    },
+    {
+        desc: "hAtom microformat",
+        itemSelector: '.hentry',
+        dateSelector: '.updated .value-title',
+        dateAttr: 'title',
+    },
+    {
+        desc: "hAtom microformat",
+        itemSelector: '.hentry',
+        dateSelector: '.published',
+    },
+    {
+        desc: "hAtom microformat",
+        itemSelector: '.hentry',
+        dateSelector: '.published .value',
+    },
+    {
+        desc: "hAtom microformat",
+        itemSelector: '.hentry',
+        dateSelector: '.published .value-title',
+        dateAttr: 'title',
+    },
+    {
+        desc: "WordPress post",
+        itemSelector: '.post',
+        dateSelector: '.post-date',
+    },
+    {
+        desc: "WordPress comment",
+        itemSelector: '.comment',
+        dateSelector: '.comment-meta',
+    },
 ];
