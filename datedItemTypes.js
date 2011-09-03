@@ -220,4 +220,25 @@ var datedItemTypes = [
         itemSelector: '.pingback',
         dateSelector: '.comment-meta',
     },
+    {
+        desc: "The Atlantic",
+        itemSelector: '#article',
+        dateSelector: '.metadata .date',
+    },
+    {
+        desc: "Yahoo search results",
+        itemSelector: '.res',
+        dateSelector: '.yschttl',
+        dateAttr: 'href',
+    },
+    {
+        desc: "USA Today",
+        itemSelector: '#content-post',
+        dateSelector: '#post-date-updated',
+    },
+    {
+        desc: "Pluck comments",
+        itemSelector: '.pluck-comm-single-comment-main',
+        dateSelector: '.pluck-comm-timestamp',
+    },
 ];
