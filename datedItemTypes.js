@@ -277,4 +277,38 @@ var datedItemTypes = [
         itemSelector: '.post',
         dateSelector: '.meta .date',
     },
+    {
+        desc: "The Daily Beast story summary",
+        itemSelector: '.media',
+        dateSelector: 'time',
+        dateAttr: 'datetime',
+    },
+    {
+        desc: "The Daily Beast story summary",
+        itemSelector: '.story, .media',
+        dateSelector: 'a',
+        dateAttr: 'href',
+    },
+    {
+        desc: "The Daily Beast featured content",
+        itemSelector: '.featureContent',
+        dateSelector: 'a',
+        dateAttr: 'href',
+    },
+    {
+        desc: "The Daily Beast blog article",
+        itemSelector: '.blogEntry',
+        dateSelector: '.timestamp',
+    },
+    {
+        desc: "Echo comment",
+        itemSelector: '.echo-item-content',
+        dateSelector: '.echo-item-date',
+    },
+    {
+        desc: "HTML5 article",
+        itemSelector: 'article',
+        dateSelector: 'time[pubdate]',
+        dateAttr: 'datetime',
+    },
 ];
