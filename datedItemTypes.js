@@ -296,8 +296,8 @@ var datedItemTypes = [
         dateAttr: 'href',
     },
     {
-        desc: "The Daily Beast blog article",
-        itemSelector: '.blogEntry',
+        desc: "The Daily Beast story",
+        itemSelector: '.blogEntry, .cheat',
         dateSelector: '.timestamp',
     },
     {
@@ -310,5 +310,47 @@ var datedItemTypes = [
         itemSelector: 'article',
         dateSelector: 'time[pubdate]',
         dateAttr: 'datetime',
+    },
+    {
+        desc: "LA Times article",
+        itemSelector: '.article',
+        dateSelector: '.date',
+    },
+    {
+        desc: "LA Times comment",
+        itemSelector: '.comment',
+        dateSelector: '.comment-info',
+    },
+    {
+        desc: "LA Times story summary",
+        itemSelector: '.headlineItem',
+        dateSelector: '.headline a',
+        dateAttr: 'href',
+    },
+    {
+        desc: "LA Times story summary",
+        itemSelector: '.feedMasherList li',
+        dateSelector: '.publishDate',
+    },
+    {
+        desc: "Tumbler (Prologue theme)",
+        itemSelector: '.post',
+        dateSelector: '.posted',
+    },
+    {
+        desc: "Tumbler (Transcender theme)",
+        itemSelector: 'article',
+        dateSelector: 'footer .time',
+    },
+    {
+        desc: "Tumbler (Effector theme)",
+        itemSelector: '.post',
+        dateSelector: '.date a, .date-reblogged a',
+        dateAttr: 'title',
+    },
+    {
+        desc: "Tumbler (Redux theme)",
+        itemSelector: '.post',
+        dateSelector: '.date',
     },
 ];
