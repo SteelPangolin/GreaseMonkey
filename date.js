@@ -162,6 +162,15 @@ function parseRelativeDate(str)
     return new Date(Date.now() - count * timeUnits[unit]);
 }
 
+var relativeDateLastRE = new RegExp('\\blast ' + timeUnitsGroupPat + '\\b', 'i');
+function parseRelativeDateLast(str)
+{
+    var match = relativeDateLastRE.exec(str);
+    if (!match) return null;
+    var unit = match[1].toLowerCase();
+    return new Date(Date.now() - timeUnits[unit]);
+}
+
 var yesterdayRE = new RegExp('\\byesterday\\b', 'i');
 function parseYesterday(str)
 {
@@ -177,12 +186,14 @@ var dateParsers = [
     parseDMYLongDate,
     parseRelativeDate,
     parseYesterday,
+    parseRelativeDateLast,
 ];
-function parseDate(str)
+function parseDate(str, parsers)
 {
-    for (var i = 0; i < dateParsers.length; i++)
+    if (!parsers) parsers = dateParsers;
+    for (var i = 0; i < parsers.length; i++)
     {
-        var date = dateParsers[i](str);
+        var date = parsers[i](str);
         if (date !== null) return date;
     }
     return null;
@@ -191,3 +202,15 @@ function parseDate(str)
 var specialDateParsers = {
     posixTimestamp: parsePosixTimestamp,
 };
+
+var textDateParsers = [
+    parseYearFirstDate,
+    parseYearLastDate,
+    parseMDYLongDate,
+    parseDMYLongDate,
+];
+
+var urlDateParsers = [
+    parseYearFirstDate,
+    parseYearLastDate,
+];

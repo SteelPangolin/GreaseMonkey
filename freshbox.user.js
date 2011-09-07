@@ -7,6 +7,7 @@
 // @require        https://raw.github.com/SteelPangolin/jstools/master/string.js
 // @require        https://raw.github.com/SteelPangolin/jstools/master/array.js
 // @require        https://raw.github.com/SteelPangolin/jstools/master/math.js
+// @require        https://raw.github.com/SteelPangolin/jstools/master/xpath.js
 // @require        https://raw.github.com/SteelPangolin/GreaseMonkey/hilite/color.js
 // @require        https://raw.github.com/SteelPangolin/GreaseMonkey/hilite/date.js
 // @require        https://raw.github.com/SteelPangolin/GreaseMonkey/hilite/datedItemTypes.js
@@ -55,8 +56,21 @@ function colorForDate(date)
         rgb2hsv(css2rgb(stopB.color)))));
 }
 
+function styleDateSource(dateSource, date)
+{
+    var color = colorForDate(date);
+    dateSource.css('border', '2px dotted {0}'.format(color));
+}
+
+function styleContent(hilite, date)
+{
+    var color = colorForDate(date);
+    hilite.css('box-shadow', 'inset 3px 3px 3px {0}'.format(color));
+}
+
 function markDatedItems()
 {
+    var foundKnownDateMarkup = false;
     for (var i = 0; i < datedItemTypes.length; i++)
     {
         var datedItemType = datedItemTypes[i];
@@ -84,19 +98,42 @@ function markDatedItems()
                     ? specialDateParsers[datedItemType.dateParser](dateStr)
                     : parseDate(dateStr);
                 if (!date) return;
-                var color = colorForDate(date);
-                GM_log('color = ' + color);
+                foundKnownDateMarkup = true;
+                styleDateSource(dateSource, date);
                 var hilite = datedItemType.hiliteSelector
                     ? $(item).find(datedItemType.hiliteSelector).first()
                     : $(item);
-                dateSource.css('border', '2px dotted {0}'.format(color));
-                hilite.css('box-shadow', 'inset 3px 3px 3px {0}'.format(color));
+                styleContent(hilite, date);
             }
             catch (exception)
             {
                 GM_log(exception);
             }
         });
+    }
+    if (!foundKnownDateMarkup) // fall back to generic page coloring
+    {
+        // look for date in document URL
+        var date = parseDate(document.URL, urlDateParsers);
+        if (date)
+        {
+            styleContent($(body), date);
+            return;
+        }
+        // look for absolute dates in text
+        var textNodes = xpath('//text()');
+        for (var i = 0; i < textNodes.length; i++)
+        {
+            var textNode = textNodes[i];
+            if (!(node instanceof Text)) continue; // skip comments
+            date = parseDate(node.data, textDateParsers);
+            if (date)
+            {
+                styleDateSource($(node.parentNode), date);
+                styleContent($('body'), date);
+                return;
+            }
+        }
     }
 }
 

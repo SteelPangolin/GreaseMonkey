@@ -82,7 +82,6 @@ var datedItemTypes = [
         dateSelector: 'nobr',
     },
     {
-        // TODO: doesn't work
         desc: "Amazon recent review",
         itemSelector: '#customerReviews td > div',
         dateSelector: '.tiny',
