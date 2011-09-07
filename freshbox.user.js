@@ -125,11 +125,11 @@ function markDatedItems()
         for (var i = 0; i < textNodes.length; i++)
         {
             var textNode = textNodes[i];
-            if (!(node instanceof Text)) continue; // skip comments
-            date = parseDate(node.data, textDateParsers);
+            if (!(textNode instanceof Text)) continue; // skip comments
+            date = parseDate(textNode.data, textDateParsers);
             if (date)
             {
-                styleDateSource($(node.parentNode), date);
+                styleDateSource($(textNode.parentNode), date);
                 styleContent($('body'), date);
                 return;
             }
