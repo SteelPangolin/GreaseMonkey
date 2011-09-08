@@ -350,4 +350,25 @@ var datedItemTypes = [
         itemSelector: '.post',
         dateSelector: '.date',
     },
+    {
+        desc: "SoundCloud",
+        itemSelector: 'div.player',
+        dateSelector: 'abbr.pretty-date',
+        dateAttr: 'title',
+    },
+];
+
+var fallbackDatedItemTypes = [
+    {
+        desc: "Date in time tag",
+        itemSelector: 'body',
+        dateSelector: 'time[datetime]',
+        dateAttr: 'datetime',
+    },
+    {
+        desc: "Date in title attribute",
+        itemSelector: 'body',
+        dateSelector: '[title]',
+        dateAttr: 'title',
+    },
 ];
