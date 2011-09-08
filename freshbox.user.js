@@ -8,9 +8,10 @@
 // @require        https://raw.github.com/SteelPangolin/jstools/master/array.js
 // @require        https://raw.github.com/SteelPangolin/jstools/master/math.js
 // @require        https://raw.github.com/SteelPangolin/jstools/master/xpath.js
-// @require        https://raw.github.com/SteelPangolin/GreaseMonkey/hilite/color.js
-// @require        https://raw.github.com/SteelPangolin/GreaseMonkey/hilite/date.js
-// @require        https://raw.github.com/SteelPangolin/GreaseMonkey/hilite/datedItemTypes.js
+// @require        https://raw.github.com/SteelPangolin/jstools/master/greasemonkey.js
+// @require        https://raw.github.com/SteelPangolin/GreaseMonkey/master/color.js
+// @require        https://raw.github.com/SteelPangolin/GreaseMonkey/master/date.js
+// @require        https://raw.github.com/SteelPangolin/GreaseMonkey/master/datedItemTypes.js
 // ==/UserScript==
 
 var stops = [
@@ -68,48 +69,58 @@ function styleContent(hilite, date)
     hilite.css('box-shadow', 'inset 3px 3px 3px {0}'.format(color));
 }
 
+function extractDateString(dateSource, dateAttr)
+{
+    if (!datedItemType.dateAttr)
+    {
+        return dateSource.text();
+    }
+    else if (datedItemType.dateAttr.startsWith('data-'))
+    {
+        return dateSource.data(datedItemType.dateAttr.slice(5));
+    }
+    else
+    {
+        return dateSource.attr(datedItemType.dateAttr);
+    }
+}
+
+function markDatedItemType(datedItemType)
+{
+    var foundAtLeastOneInstance = false;
+    $(datedItemType.itemSelector).each(function (index, item)
+    {
+        try
+        {
+            var dateSource = $(item).find(datedItemType.dateSelector).first();
+            if (dateSource.length === 0) return;
+            var dateStr = extractDateString(dateSource, datedItemType.dateAttr);
+            if (!dateStr) return;
+            var date = specialDateParsers.hasOwnProperty(datedItemType.dateParser)
+                ? specialDateParsers[datedItemType.dateParser](dateStr)
+                : parseDate(dateStr);
+            if (!date) return;
+            foundAtLeastOneInstance = true;
+            styleDateSource(dateSource, date);
+            var hilite = datedItemType.hiliteSelector
+                ? $(item).find(datedItemType.hiliteSelector).first()
+                : $(item);
+            styleContent(hilite, date);
+        }
+        catch (exception)
+        {
+            GM_log(exception);
+        }
+    });
+    return foundAtLeastOneInstance;
+}
+
 function markDatedItems()
 {
     var foundKnownDateMarkup = false;
     for (var i = 0; i < datedItemTypes.length; i++)
     {
-        var datedItemType = datedItemTypes[i];
-        $(datedItemType.itemSelector).each(function (index, item)
-        {
-            try
-            {
-                var dateSource = $(item).find(datedItemType.dateSelector).first();
-                if (dateSource.length === 0) return;
-                var dateStr;
-                if (!datedItemType.dateAttr)
-                {
-                    dateStr = dateSource.text();
-                }
-                else if (datedItemType.dateAttr.startsWith('data-'))
-                {
-                    dateStr = dateSource.data(datedItemType.dateAttr.slice(5));
-                }
-                else
-                {
-                    dateStr = dateSource.attr(datedItemType.dateAttr);
-                }
-                if (!dateStr) return;
-                var date = specialDateParsers.hasOwnProperty(datedItemType.dateParser)
-                    ? specialDateParsers[datedItemType.dateParser](dateStr)
-                    : parseDate(dateStr);
-                if (!date) return;
-                foundKnownDateMarkup = true;
-                styleDateSource(dateSource, date);
-                var hilite = datedItemType.hiliteSelector
-                    ? $(item).find(datedItemType.hiliteSelector).first()
-                    : $(item);
-                styleContent(hilite, date);
-            }
-            catch (exception)
-            {
-                GM_log(exception);
-            }
-        });
+        foundKnownDateMarkup |= markDatedItemType(datedItemTypes[i]);
     }
     if (!foundKnownDateMarkup) // fall back to generic page coloring
     {
